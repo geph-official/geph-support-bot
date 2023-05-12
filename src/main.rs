@@ -8,7 +8,6 @@ use argh::FromArgs;
 use database::ChatHistory;
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 use telegram::{recv_telegram, TelegramBot};
 
 /// A tool to run the Geph support bot.
@@ -30,15 +29,7 @@ struct Config {
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Message {
     pub text: String,
-    pub convo_id: u64,
-    pub platform: Platform,
-    pub metadata: Value,
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug)]
-pub enum Platform {
-    Telegram,
-    Email,
+    pub convo_id: i64,
 }
 
 static ARGS: Lazy<Args> = Lazy::new(argh::from_env);

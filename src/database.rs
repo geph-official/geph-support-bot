@@ -1,9 +1,39 @@
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use sqlx::{
     migrate::MigrateDatabase, Connection, Executor, Row, Sqlite, SqliteConnection, SqlitePool,
 };
 
-pub struct ChatHistory {
-    db_pool: SqlitePool,
+use crate::Message;
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub enum Role {
+    User,
+    Assistant,
+}
+
+impl Role {
+    pub fn to_string(&self) -> String {
+        match self {
+            Role::User => "user".to_owned(),
+            Role::Assistant => "assistant".to_owned(),
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub enum Platform {
+    Telegram,
+    Email,
+}
+
+impl Platform {
+    pub fn to_string(&self) -> String {
+        match self {
+            Platform::Telegram => "telegram".to_owned(),
+            Platform::Email => "email".to_owned(),
+        }
+    }
 }
 
 // #[derive(sqlx::FromRow)]
@@ -19,6 +49,10 @@ pub struct ChatHistory {
 //     platform: Platform,
 // }
 
+pub struct ChatHistory {
+    db_pool: SqlitePool,
+}
+
 impl ChatHistory {
     /// Creates a new chat history database
     pub async fn new(db_path: &str) -> anyhow::Result<Self> {
@@ -26,11 +60,10 @@ impl ChatHistory {
             Sqlite::create_database(db_path).await?;
 
             // create tables
-            // note: sqlite doesn't have 64 bit integers, so we store the convo_id as a string
             let mut conn = SqliteConnection::connect(db_path).await?;
             conn.execute(
                 "CREATE TABLE IF NOT EXISTS messages (
-                convo_id TEXT PRIMARY KEY,
+                convo_id BIGINT PRIMARY KEY,
                 text TEXT,
                 sender TEXT
             )",
@@ -39,7 +72,7 @@ impl ChatHistory {
 
             conn.execute(
                 "CREATE TABLE IF NOT EXISTS metadata (
-                convo_id TEXT REFERENCES messages(convo_id) ON DELETE CASCADE,
+                convo_id BIGINT REFERENCES messages(convo_id) ON DELETE CASCADE,
                 platform TEXT,
                 metadata BLOB
             )",
@@ -51,38 +84,56 @@ impl ChatHistory {
         })
     }
 
+    pub async fn add_msg(
+        &mut self,
+        msg: Message,
+        platform: Platform,
+        role: Role,
+        metadata: Value,
+    ) -> anyhow::Result<()> {
+        let mut tx = self.db_pool.begin().await?;
+        sqlx::query("INSERT INTO messages (convo_id, text, sender) VALUES (?, ?, ?)")
+            .bind(msg.convo_id)
+            .bind(msg.text)
+            .bind(role.to_string())
+            .execute(&mut tx)
+            .await?;
+        sqlx::query("INSERT INTO metadata (convo_id, platform, metadata)")
+            .bind(msg.convo_id)
+            .bind(platform.to_string())
+            .bind(serde_json::to_vec(&metadata)?)
+            .execute(&mut tx)
+            .await?;
+        tx.commit().await?;
+
+        Ok(())
+    }
+
     /// Returns the convo id of a message if it exists in the database
-    pub async fn txt_to_id(&self, text: &str) -> Option<u64> {
+    pub async fn txt_to_id(&self, text: &str) -> Option<i64> {
         if let Ok(row) = sqlx::query("SELECT convo_id FROM messages WHERE text=?")
             .bind(text)
             .fetch_one(&self.db_pool)
             .await
         {
-            let id: String = row.get("convo_id");
-            Some(id.parse::<u64>().unwrap())
+            let id: i64 = row.get("convo_id");
+            Some(id)
         } else {
             None
         }
     }
 
-    /// Returns all messages in DB with the given convo_id with sender info, formatted as:
-    /// "sender: message"
+    /// Returns all messages in DB with the given convo_id with sender info, as (sender, message)
     /// TODO: order of the messages
-    pub async fn get_context(&self, convo_id: u64) -> anyhow::Result<Vec<String>> {
+    pub async fn get_context(&self, convo_id: i64) -> anyhow::Result<Vec<(String, String)>> {
         let rows = sqlx::query("SELECT sender, text FROM messages WHERE convo_id=?")
-            .bind(convo_id.to_string())
+            .bind(convo_id)
             .fetch_all(&self.db_pool)
             .await?;
 
-        let ret = rows
+        Ok(rows
             .iter()
-            .map(|row| {
-                let sender: String = row.get("sender");
-                let text: String = row.get("text");
-                sender + ": " + &text
-            })
-            .collect();
-
-        Ok(ret)
+            .map(|row| (row.get("sender"), row.get("text")))
+            .collect())
     }
 }
