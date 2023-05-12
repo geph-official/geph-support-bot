@@ -2,7 +2,11 @@ use anyhow::Context;
 use isahc::{AsyncReadResponseExt, Request};
 use serde_json::{json, Value};
 
-use crate::{responder::respond, Message, DB, TELEGRAM};
+use crate::{
+    database::{Platform, Role},
+    responder::respond,
+    Message, DB, TELEGRAM,
+};
 
 /// A client of the Telegram bot API.
 pub struct TelegramBot {
@@ -68,8 +72,6 @@ pub async fn recv_telegram() {
                 // we only support text msgs atm
                 counter = counter.max(update["update_id"].as_i64().unwrap_or_default());
                 if update["my_chat_member"].is_null() && update["message"].is_object() {
-                    // add to db
-
                     // todo: learn if the chat is from the admin!
                     let convo_id = get_convo_id(update.clone()).await.unwrap();
                     let msg = update["message"]["text"]
@@ -82,13 +84,43 @@ pub async fn recv_telegram() {
                         || update["message"]["reply_to_message"]["from"]["username"].as_str()
                             == Some("GephSupportBot")
                     {
-                        let msg = Message {
+                        let message = Message {
                             text: msg.to_owned(),
                             convo_id,
                         };
-                        // TODO add to database to not forget
-                        let resp = respond(msg).await.context("cannot calculate response")?;
-                        let json_resp = telegram_json(resp);
+                        let resp = respond(message.clone())
+                            .await
+                            .context("cannot calculate response")?;
+
+                        // add question & response to db
+                        DB.add_msg(
+                            message.clone(),
+                            Platform::Telegram,
+                            Role::User,
+                            json!({"lol": "todo"}),
+                        )
+                        .await?;
+                        DB.add_msg(
+                            Message {
+                                text: resp.clone(),
+                                convo_id: message.convo_id,
+                            },
+                            Platform::Telegram,
+                            Role::Assistant,
+                            json!({"lol": "todo"}),
+                        )
+                        .await?;
+
+                        // send response to telegram
+                        let json_resp = telegram_json(
+                            resp,
+                            update["message"]["chat"]["id"]
+                                .as_i64()
+                                .context("could not get chat id")?,
+                            update["message"]["message_id"]
+                                .as_i64()
+                                .context("could not get message_id")?,
+                        );
                         TELEGRAM
                             .call_api("sendMessage", json_resp)
                             .await
@@ -104,14 +136,14 @@ pub async fn recv_telegram() {
     }
 }
 
-async fn get_convo_id(msg: Value) -> anyhow::Result<i64> {
-    if msg["chat"]["type"] == "private" {
-        msg["chat"]["id"]
+async fn get_convo_id(update: Value) -> anyhow::Result<i64> {
+    if update["chat"]["type"] == "private" {
+        update["chat"]["id"]
             .as_i64()
-            .context("chat_id could not be converted to u64")
+            .context("chat_id could not be converted to i64")
     } else {
-        if msg["message"]["reply_to_message"].is_object() {
-            if let Some(id) = DB.txt_to_id(&msg["message"]["text"].to_string()).await {
+        if update["message"]["reply_to_message"].is_object() {
+            if let Some(id) = DB.txt_to_id(&update["message"]["text"].to_string()).await {
                 return Ok(id);
             }
         }
@@ -120,6 +152,10 @@ async fn get_convo_id(msg: Value) -> anyhow::Result<i64> {
 }
 
 // puts message into correct json format for telegram bot api
-fn telegram_json(msg: String) -> Value {
-    todo!()
+fn telegram_json(msg: String, chat_id: i64, reply_to_message_id: i64) -> Value {
+    json!({
+        "chat_id": chat_id,
+        "text": msg,
+        "reply_to_message_id": reply_to_message_id,
+    })
 }

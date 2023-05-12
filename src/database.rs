@@ -85,7 +85,7 @@ impl ChatHistory {
     }
 
     pub async fn add_msg(
-        &mut self,
+        &self,
         msg: Message,
         platform: Platform,
         role: Role,
