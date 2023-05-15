@@ -7,16 +7,17 @@ use crate::{Message, CONFIG, DB};
 pub async fn respond(msg: Message) -> anyhow::Result<String> {
     // prompt
     let prompt = include_str!("initial-prompt.txt").to_owned();
-
     // chat history
     let mut role_contents = trim_context(DB.get_context(msg.convo_id).await?).await;
     // add the latest msg to the convo
     let latest_msg = ("user".to_owned(), msg.text.replace("@GephSupportBot", ""));
     role_contents.push(latest_msg);
+    log::debug!("CHAT HISTORY = {:?}", role_contents);
 
     let resp = call_openai_api(prompt, role_contents).await?;
     log::debug!("LLM response: {resp}");
     Ok(resp)
+    // Ok("Hello! Excited to be of assistance ^_^".to_owned())
 }
 
 // TODO!
@@ -57,7 +58,7 @@ async fn call_openai_api(
         .await?
         .json()
         .await?;
-
+    log::debug!("OPENAI RESP = {:?}", resp);
     let resp = &mut resp["choices"][0]["message"];
     if resp["role"].is_string() {
         let toret = resp["content"]

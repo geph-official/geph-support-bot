@@ -54,10 +54,10 @@ impl TelegramBot {
     }
 }
 
-pub async fn recv_telegram() {
+pub async fn handle_telegram() {
     let mut counter = 0;
     loop {
-        log::debug!("getting updates at {counter}");
+        log::info!("getting updates at {counter}");
         let fallible = async {
             let updates = TELEGRAM
                 .call_api(
@@ -67,28 +67,26 @@ pub async fn recv_telegram() {
                 .await
                 .context("cannot call telegram for updates")?;
             let updates: Vec<Value> = serde_json::from_value(updates)?;
-
             for update in updates {
                 // we only support text msgs atm
                 counter = counter.max(update["update_id"].as_i64().unwrap_or_default());
-                if update["my_chat_member"].is_null() && update["message"].is_object() {
+                if !update["message"]["text"].is_null() {
                     // todo: learn if the chat is from the admin!
                     let convo_id = get_convo_id(update.clone()).await.unwrap();
                     let msg = update["message"]["text"]
                         .as_str()
                         .context("cannot parse out text")?;
-                    if !msg.contains("is_forum") {
-                        anyhow::bail!("not in a forum")
-                    }
+                    log::info!("msg = {msg}");
                     if msg.contains("@GephSupportBot")
                         || update["message"]["reply_to_message"]["from"]["username"].as_str()
                             == Some("GephSupportBot")
+                        || update["message"]["chat"]["type"].as_str() == Some("private")
                     {
                         let message = Message {
                             text: msg.to_owned(),
                             convo_id,
                         };
-                        let resp = respond(message.clone())
+                        let mut resp = respond(message.clone())
                             .await
                             .context("cannot calculate response")?;
 
@@ -112,6 +110,16 @@ pub async fn recv_telegram() {
                         .await?;
 
                         // send response to telegram
+                        if !update["message"]["from"]["username"].is_null()
+                            && update["message"]["chat"]["type"].as_str() != Some("private")
+                        {
+                            resp = "@".to_owned()
+                                + update["message"]["from"]["username"]
+                                    .as_str()
+                                    .context("no sender username!")?
+                                + " "
+                                + &resp;
+                        }
                         let json_resp = telegram_json(
                             resp,
                             update["message"]["chat"]["id"]
@@ -131,18 +139,18 @@ pub async fn recv_telegram() {
             anyhow::Ok(())
         };
         if let Err(err) = fallible.await {
-            log::warn!("error getting updates: {:?}", err)
+            log::error!("error getting updates: {:?}", err)
         }
     }
 }
 
 async fn get_convo_id(update: Value) -> anyhow::Result<i64> {
-    if update["chat"]["type"] == "private" {
-        update["chat"]["id"]
+    if update["message"]["chat"]["type"] == "private" {
+        update["message"]["chat"]["id"]
             .as_i64()
-            .context("chat_id could not be converted to i64")
+            .context("chat id could not be converted to i64")
     } else {
-        if update["message"]["reply_to_message"].is_object() {
+        if !update["message"]["reply_to_message"].is_null() {
             if let Some(id) = DB.txt_to_id(&update["message"]["text"].to_string()).await {
                 return Ok(id);
             }

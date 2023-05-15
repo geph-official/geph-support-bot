@@ -56,29 +56,26 @@ pub struct ChatHistory {
 impl ChatHistory {
     /// Creates a new chat history database
     pub async fn new(db_path: &str) -> anyhow::Result<Self> {
-        if !Sqlite::database_exists(db_path).await? {
-            Sqlite::create_database(db_path).await?;
-
-            // create tables
-            let mut conn = SqliteConnection::connect(db_path).await?;
-            conn.execute(
-                "CREATE TABLE IF NOT EXISTS messages (
+        // create tables
+        let mut conn = SqliteConnection::connect(&format!("file:{db_path}?mode=rwc")).await?;
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS conversations (
                 convo_id BIGINT PRIMARY KEY,
-                text TEXT,
-                sender TEXT
-            )",
-            )
-            .await?;
-
-            conn.execute(
-                "CREATE TABLE IF NOT EXISTS metadata (
-                convo_id BIGINT REFERENCES messages(convo_id) ON DELETE CASCADE,
                 platform TEXT,
                 metadata BLOB
             )",
-            )
-            .await?;
-        }
+        )
+        .await?;
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS messages (
+            convo_id BIGINT,
+            text TEXT,
+            sender TEXT,
+            FOREIGN KEY(convo_id) REFERENCES conversations(convo_id)
+        )",
+        )
+        .await?;
+
         Ok(Self {
             db_pool: SqlitePool::connect(db_path).await?,
         })
@@ -92,16 +89,18 @@ impl ChatHistory {
         metadata: Value,
     ) -> anyhow::Result<()> {
         let mut tx = self.db_pool.begin().await?;
+        sqlx::query(
+            "INSERT OR REPLACE INTO conversations (convo_id, platform, metadata) VALUES (?, ?, ?)",
+        )
+        .bind(msg.convo_id)
+        .bind(platform.to_string())
+        .bind(serde_json::to_vec(&metadata)?)
+        .execute(&mut tx)
+        .await?;
         sqlx::query("INSERT INTO messages (convo_id, text, sender) VALUES (?, ?, ?)")
             .bind(msg.convo_id)
-            .bind(msg.text)
+            .bind(msg.text.clone())
             .bind(role.to_string())
-            .execute(&mut tx)
-            .await?;
-        sqlx::query("INSERT INTO metadata (convo_id, platform, metadata)")
-            .bind(msg.convo_id)
-            .bind(platform.to_string())
-            .bind(serde_json::to_vec(&metadata)?)
             .execute(&mut tx)
             .await?;
         tx.commit().await?;
