@@ -1,12 +1,13 @@
 mod database;
 mod learn;
+mod openai;
 mod responder;
 mod telegram;
 
 use std::path::PathBuf;
 
 use argh::FromArgs;
-use database::ChatHistory;
+use database::ChatHistoryDb;
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use telegram::{handle_telegram, TelegramBot};
@@ -24,7 +25,8 @@ struct Args {
 struct Config {
     telegram_token: String,
     openai_key: String,
-    db_path: String,
+    history_db: String,
+    binder_db: String,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -40,8 +42,8 @@ static CONFIG: Lazy<Config> = Lazy::new(|| {
     serde_yaml::from_slice(s).expect("cannot parse config file")
 });
 
-static DB: Lazy<ChatHistory> = Lazy::new(|| {
-    smol::future::block_on(ChatHistory::new(&CONFIG.db_path))
+static DB: Lazy<ChatHistoryDb> = Lazy::new(|| {
+    smol::future::block_on(ChatHistoryDb::new(&CONFIG.history_db))
         .expect("cannot create chat history db")
 });
 
@@ -51,4 +53,11 @@ fn main() {
     env_logger::init();
     smolscale::block_on(handle_telegram());
     // todo: email loop
+    // let s = include_str!("facts.txt");
+    // let lines = s.lines();
+    // smol::block_on(async {
+    //     for line in lines {
+    //         DB.insert_fact(line).await.unwrap();
+    //     }
+    // })
 }

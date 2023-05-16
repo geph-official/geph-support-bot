@@ -4,9 +4,12 @@ use serde_json::{json, Value};
 
 use crate::{
     database::{Platform, Role},
+    learn::learn,
     responder::respond,
     Message, DB, TELEGRAM,
 };
+
+const ADMIN_UNAME: &str = "nullchinchilla";
 
 /// A client of the Telegram bot API.
 pub struct TelegramBot {
@@ -71,7 +74,6 @@ pub async fn handle_telegram() {
                 // we only support text msgs atm
                 counter = counter.max(update["update_id"].as_i64().unwrap_or_default());
                 if !update["message"]["text"].is_null() {
-                    // todo: learn if the chat is from the admin!
                     let convo_id = get_convo_id(update.clone()).await.unwrap();
                     let msg = update["message"]["text"]
                         .as_str()
@@ -82,57 +84,67 @@ pub async fn handle_telegram() {
                             == Some("GephSupportBot")
                         || update["message"]["chat"]["type"].as_str() == Some("private")
                     {
-                        let message = Message {
-                            text: msg.to_owned(),
-                            convo_id,
+                        if let Some(uname) = update["message"]["from"]["username"].as_str() {
+                            let message = Message {
+                                text: uname.to_owned() + ": " + msg,
+                                convo_id,
+                            };
+                            // learn if the chat is from the admin & contains "#learn"
+                            // log::debug!(
+                            //     "{uname}, text.contains(#learn) = {}",
+                            //     message.text.contains("#learn")
+                            // );
+                            let mut resp =
+                                if uname == ADMIN_UNAME && message.text.contains("#learn") {
+                                    learn(message.clone()).await?
+                                } else {
+                                    respond(message.clone())
+                                        .await
+                                        .context("cannot calculate response")?
+                                };
+
+                            // add question & response to db
+                            DB.insert_msg(
+                                &message,
+                                Platform::Telegram,
+                                Role::User,
+                                json!({"lol": "todo"}),
+                            )
+                            .await?;
+                            DB.insert_msg(
+                                &Message {
+                                    text: resp.clone(),
+                                    convo_id: message.convo_id,
+                                },
+                                Platform::Telegram,
+                                Role::Assistant,
+                                json!({"lol": "todo"}),
+                            )
+                            .await?;
+
+                            // send response to telegram
+                            if update["message"]["chat"]["type"].as_str() != Some("private") {
+                                resp = "@".to_owned()
+                                    + update["message"]["from"]["username"]
+                                        .as_str()
+                                        .context("no sender username!")?
+                                    + " "
+                                    + &resp;
+                            }
+                            let json_resp = telegram_json(
+                                resp,
+                                update["message"]["chat"]["id"]
+                                    .as_i64()
+                                    .context("could not get chat id")?,
+                                update["message"]["message_id"]
+                                    .as_i64()
+                                    .context("could not get message_id")?,
+                            );
+                            TELEGRAM
+                                .call_api("sendMessage", json_resp)
+                                .await
+                                .context("cannot send reply back to telegram")?;
                         };
-                        let mut resp = respond(message.clone())
-                            .await
-                            .context("cannot calculate response")?;
-
-                        // add question & response to db
-                        DB.add_msg(
-                            message.clone(),
-                            Platform::Telegram,
-                            Role::User,
-                            json!({"lol": "todo"}),
-                        )
-                        .await?;
-                        DB.add_msg(
-                            Message {
-                                text: resp.clone(),
-                                convo_id: message.convo_id,
-                            },
-                            Platform::Telegram,
-                            Role::Assistant,
-                            json!({"lol": "todo"}),
-                        )
-                        .await?;
-
-                        // send response to telegram
-                        if !update["message"]["from"]["username"].is_null()
-                            && update["message"]["chat"]["type"].as_str() != Some("private")
-                        {
-                            resp = "@".to_owned()
-                                + update["message"]["from"]["username"]
-                                    .as_str()
-                                    .context("no sender username!")?
-                                + " "
-                                + &resp;
-                        }
-                        let json_resp = telegram_json(
-                            resp,
-                            update["message"]["chat"]["id"]
-                                .as_i64()
-                                .context("could not get chat id")?,
-                            update["message"]["message_id"]
-                                .as_i64()
-                                .context("could not get message_id")?,
-                        );
-                        TELEGRAM
-                            .call_api("sendMessage", json_resp)
-                            .await
-                            .context("cannot send reply back to telegram")?;
                     }
                 }
             }
@@ -145,18 +157,19 @@ pub async fn handle_telegram() {
 }
 
 async fn get_convo_id(update: Value) -> anyhow::Result<i64> {
-    if update["message"]["chat"]["type"] == "private" {
-        update["message"]["chat"]["id"]
-            .as_i64()
-            .context("chat id could not be converted to i64")
-    } else {
-        if !update["message"]["reply_to_message"].is_null() {
-            if let Some(id) = DB.txt_to_id(&update["message"]["text"].to_string()).await {
-                return Ok(id);
-            }
-        }
-        Ok(rand::random())
-    }
+    // if update["message"]["chat"]["type"] == "private" {
+    update["message"]["chat"]["id"]
+        .as_i64()
+        .context("chat id could not be converted to i64")
+    // }
+    // } else {
+    //     if !update["message"]["reply_to_message"].is_null() {
+    //         if let Some(id) = DB.txt_to_id(&update["message"]["text"].to_string()).await {
+    //             return Ok(id);
+    //         }
+    //     }
+    //     Ok(rand::random())
+    // }
 }
 
 // puts message into correct json format for telegram bot api

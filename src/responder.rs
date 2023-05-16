@@ -1,72 +1,58 @@
-use anyhow::Context;
-use isahc::{AsyncReadResponseExt, Request, RequestExt};
-use serde_json::{json, Value};
+use crate::{
+    database::trim_convo_history,
+    openai::{call_openai_api, get_chatbot_prompt},
+    Message, CONFIG, DB,
+};
+use serde::{Deserialize, Serialize};
+use sqlx::{Connection, PgConnection};
 
-use crate::{Message, CONFIG, DB};
+#[derive(Serialize, Deserialize, Debug, Clone)]
+enum Action {
+    Null,
+    TransferPlus {
+        old_uname: String,
+        new_uname: String,
+    },
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+struct AiResponse {
+    action: Action,
+    text: String,
+}
 
 pub async fn respond(msg: Message) -> anyhow::Result<String> {
     // prompt
-    let prompt = include_str!("initial-prompt.txt").to_owned();
+    let prompt = get_chatbot_prompt().await?;
     // chat history
-    let mut role_contents = trim_context(DB.get_context(msg.convo_id).await?).await;
-    // add the latest msg to the convo
+    let mut role_contents = trim_convo_history(DB.get_convo_history(msg.convo_id).await?).await;
     let latest_msg = ("user".to_owned(), msg.text.replace("@GephSupportBot", ""));
     role_contents.push(latest_msg);
-    log::debug!("CHAT HISTORY = {:?}", role_contents);
 
-    let resp = call_openai_api(prompt, role_contents).await?;
-    log::debug!("LLM response: {resp}");
-    Ok(resp)
+    let resp: AiResponse = serde_json::from_str(&call_openai_api(prompt, role_contents).await?)?;
+    log::debug!("AiResponse = {:?}", resp);
+    // perform the action
+    match resp.action {
+        Action::Null => {}
+        Action::TransferPlus {
+            old_uname,
+            new_uname,
+        } => {
+            transfer_plus(&old_uname, &new_uname).await?;
+        }
+    }
+
+    Ok(resp.text)
     // Ok("Hello! Excited to be of assistance ^_^".to_owned())
 }
 
-// TODO!
-async fn trim_context(mut context: Vec<(String, String)>) -> Vec<(String, String)> {
-    // trim context if too long
-    // currently: simple truncation. may summarize with gpt to compress later
-    while context
-        .iter()
-        .fold(0, |len, (s1, s2)| len + s1.len() + s2.len())
-        > 10000
-    {
-        context.remove(0);
-    }
-    context
-}
-
-async fn call_openai_api(
-    prompt: String,
-    role_contents: Vec<(String, String)>,
-) -> anyhow::Result<String> {
-    let mut msgs: Vec<Value> = role_contents
-        .iter()
-        .map(|(role, content)| json!({"role": role, "content": content}))
-        .collect();
-    msgs.insert(0, json!({"role": "system", "content": prompt}));
-
-    let req = json!({
-        "model": "gpt-4",
-        "messages": msgs
-        // "max_tokens": 300
-    });
-
-    let mut resp: Value = Request::post("https://api.openai.com/v1/chat/completions")
-        .header("Content-Type", "application/json")
-        .header("Authorization", "Bearer ".to_string() + &CONFIG.openai_key)
-        .body(serde_json::to_vec(&req)?)?
-        .send_async()
-        .await?
-        .json()
-        .await?;
-    log::debug!("OPENAI RESP = {:?}", resp);
-    let resp = &mut resp["choices"][0]["message"];
-    if resp["role"].is_string() {
-        let toret = resp["content"]
-            .as_str()
-            .context("no content for response")?
-            .to_string();
-        Ok(toret)
-    } else {
-        anyhow::bail!("no role in response")
-    }
+async fn transfer_plus(old_uname: &str, new_uname: &str) -> anyhow::Result<()> {
+    let mut conn = PgConnection::connect(&CONFIG.binder_db).await?;
+    log::debug!("connected to binder!");
+    let res = sqlx::query("update subscriptions set id = (select id from users_legacy where username='$1') where id = (select id from users_legacy where username='$2')")
+    .bind(new_uname)
+    .bind(old_uname).
+    execute(&mut conn).await?;
+    log::debug!("{} rows affected!", res.rows_affected());
+    Ok(())
 }

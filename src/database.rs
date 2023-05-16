@@ -1,8 +1,6 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use sqlx::{
-    migrate::MigrateDatabase, Connection, Executor, Row, Sqlite, SqliteConnection, SqlitePool,
-};
+use sqlx::{Connection, Executor, Row, SqliteConnection, SqlitePool};
 
 use crate::Message;
 
@@ -36,24 +34,11 @@ impl Platform {
     }
 }
 
-// #[derive(sqlx::FromRow)]
-// struct DbMessage {
-//     convo_id: String,
-//     text: String,
-//     sender: String,
-// }
-
-// #[derive(sqlx::FromRow)]
-// struct DbMetadata {
-//     convo_id: u64,
-//     platform: Platform,
-// }
-
-pub struct ChatHistory {
+pub struct ChatHistoryDb {
     db_pool: SqlitePool,
 }
 
-impl ChatHistory {
+impl ChatHistoryDb {
     /// Creates a new chat history database
     pub async fn new(db_path: &str) -> anyhow::Result<Self> {
         // create tables
@@ -75,15 +60,37 @@ impl ChatHistory {
         )",
         )
         .await?;
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS facts (
+            fact TEXT
+        )",
+        )
+        .await?;
 
         Ok(Self {
             db_pool: SqlitePool::connect(db_path).await?,
         })
     }
 
-    pub async fn add_msg(
+    pub async fn insert_fact(&self, fact: &str) -> anyhow::Result<()> {
+        sqlx::query("INSERT INTO facts (fact) VALUES (?)")
+            .bind(fact)
+            .execute(&self.db_pool)
+            .await?;
+        Ok(())
+    }
+
+    pub async fn get_all_facts(&self) -> anyhow::Result<Vec<String>> {
+        let facts = sqlx::query("SELECT * FROM facts")
+            .fetch_all(&self.db_pool)
+            .await?;
+        let ret: Vec<String> = facts.iter().map(|row| row.get("fact")).collect();
+        Ok(ret)
+    }
+
+    pub async fn insert_msg(
         &self,
-        msg: Message,
+        msg: &Message,
         platform: Platform,
         role: Role,
         metadata: Value,
@@ -124,7 +131,7 @@ impl ChatHistory {
 
     /// Returns all messages in DB with the given convo_id with sender info, as (sender, message)
     /// TODO: order of the messages
-    pub async fn get_context(&self, convo_id: i64) -> anyhow::Result<Vec<(String, String)>> {
+    pub async fn get_convo_history(&self, convo_id: i64) -> anyhow::Result<Vec<(String, String)>> {
         let rows = sqlx::query("SELECT sender, text FROM messages WHERE convo_id=?")
             .bind(convo_id)
             .fetch_all(&self.db_pool)
@@ -135,4 +142,18 @@ impl ChatHistory {
             .map(|row| (row.get("sender"), row.get("text")))
             .collect())
     }
+}
+
+// TODO!
+pub async fn trim_convo_history(mut context: Vec<(String, String)>) -> Vec<(String, String)> {
+    // trim context if too long
+    // currently: simple truncation. may summarize with gpt to compress later
+    while context
+        .iter()
+        .fold(0, |len, (s1, s2)| len + s1.len() + s2.len())
+        > 10000
+    {
+        context.remove(0);
+    }
+    context
 }
