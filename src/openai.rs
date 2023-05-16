@@ -5,8 +5,9 @@ use serde_json::{json, Value};
 use crate::{CONFIG, DB};
 
 pub async fn call_openai_api(
-    prompt: String,
-    role_contents: Vec<(String, String)>,
+    model: &str,
+    prompt: &str,
+    role_contents: &[(String, String)],
 ) -> anyhow::Result<String> {
     let mut msgs: Vec<Value> = role_contents
         .iter()
@@ -15,9 +16,9 @@ pub async fn call_openai_api(
     msgs.insert(0, json!({"role": "system", "content": prompt}));
 
     let req = json!({
-        "model": "gpt-4",
-        "messages": msgs
-        // "max_tokens": 300
+        "model": model,
+        "messages": msgs,
+        "max_tokens": 500
     });
 
     let mut resp: Value = Request::post("https://api.openai.com/v1/chat/completions")

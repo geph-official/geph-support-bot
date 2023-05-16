@@ -94,14 +94,13 @@ pub async fn handle_telegram() {
                             //     "{uname}, text.contains(#learn) = {}",
                             //     message.text.contains("#learn")
                             // );
-                            let mut resp =
-                                if uname == ADMIN_UNAME && message.text.contains("#learn") {
-                                    learn(message.clone()).await?
-                                } else {
-                                    respond(message.clone())
-                                        .await
-                                        .context("cannot calculate response")?
-                                };
+                            let resp = if uname == ADMIN_UNAME && message.text.contains("#learn") {
+                                learn(message.clone()).await?
+                            } else {
+                                respond(message.clone())
+                                    .await
+                                    .context("cannot calculate response")?
+                            };
 
                             // add question & response to db
                             DB.insert_msg(
@@ -123,14 +122,14 @@ pub async fn handle_telegram() {
                             .await?;
 
                             // send response to telegram
-                            if update["message"]["chat"]["type"].as_str() != Some("private") {
-                                resp = "@".to_owned()
-                                    + update["message"]["from"]["username"]
-                                        .as_str()
-                                        .context("no sender username!")?
-                                    + " "
-                                    + &resp;
-                            }
+                            // if update["message"]["chat"]["type"].as_str() != Some("private") {
+                            //     resp = "@".to_owned()
+                            //         + update["message"]["from"]["username"]
+                            //             .as_str()
+                            //             .context("no sender username!")?
+                            //         + " "
+                            //         + &resp;
+                            // }
                             let json_resp = telegram_json(
                                 resp,
                                 update["message"]["chat"]["id"]
