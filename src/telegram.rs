@@ -1,6 +1,9 @@
+use std::time::Duration;
+
 use anyhow::Context;
 use isahc::{AsyncReadResponseExt, Request};
 use serde_json::{json, Value};
+use smol_timeout::TimeoutExt;
 
 use crate::{
     database::{Platform, Role},
@@ -140,8 +143,13 @@ pub async fn handle_telegram() {
             }
             anyhow::Ok(())
         };
-        if let Err(err) = fallible.await {
-            log::error!("error getting updates: {:?}", err)
+        match fallible.timeout(Duration::from_secs(300)).await {
+            Some(x) => {
+                if let Err(err) = x {
+                    log::error!("error getting updates: {:?}", err)
+                }
+            }
+            None => log::error!("timed out getting telegram updates!"),
         }
     }
 }
