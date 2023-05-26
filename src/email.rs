@@ -4,16 +4,13 @@ use async_compat::CompatExt;
 use warp::Filter;
 
 pub async fn handle_email() -> anyhow::Result<()> {
-    let echo = warp::path("support-bot-email").and(warp::post()).map(|| {
-        log::debug!("got email!");
-        "Hi! I am GephSupportBot. How can I help you with Geph today?"
-    });
-    // .and(warp::body::form())
-    // .map(|form: HashMap<String, String>| {
-    //     let form = format!("{:?}", form);
-    //     log::debug!("{}", form);
-    //     form
-    // });
+    let echo = warp::path("support-bot-email").and(warp::body::form()).map(
+        |form: HashMap<String, String>| {
+            let form = format!("{:?}", form);
+            log::debug!("{}", form);
+            form
+        },
+    );
 
     warp::serve(echo).run(([0, 0, 0, 0], 3030)).compat().await;
     // receives emails
