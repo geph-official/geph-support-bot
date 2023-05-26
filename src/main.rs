@@ -1,4 +1,5 @@
 mod database;
+mod email;
 mod learn;
 mod openai;
 mod responder;
@@ -8,6 +9,7 @@ use std::path::PathBuf;
 
 use argh::FromArgs;
 use database::ChatHistoryDb;
+use email::handle_email;
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use telegram::{handle_telegram, TelegramBot};
@@ -23,10 +25,11 @@ struct Args {
 /// The struct containing the bot configuration
 #[derive(Serialize, Deserialize)]
 struct Config {
-    telegram_token: String,
-    openai_key: String,
     history_db: String,
     binder_db: String,
+    openai_key: String,
+    telegram_token: String,
+    mailgun_key: String,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -51,6 +54,7 @@ static TELEGRAM: Lazy<TelegramBot> = Lazy::new(|| TelegramBot::new(&CONFIG.teleg
 
 fn main() {
     env_logger::init();
+    smolscale::spawn(handle_email()).detach();
     smolscale::block_on(handle_telegram());
     // todo: email loop
     // let s = include_str!("facts.txt");
