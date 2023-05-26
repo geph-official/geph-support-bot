@@ -16,7 +16,7 @@ pub async fn handle_email() -> anyhow::Result<()> {
     warp::serve(echo).run(([0, 0, 0, 0], 3030)).compat().await;
     // receives emails
 
-    // gets response & acts
+    // gets response & acts lol
 
     // sends reply
     Ok(())
