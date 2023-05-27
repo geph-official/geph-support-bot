@@ -50,33 +50,33 @@ async fn handle_email_inner(email: HashMap<String, String>) -> anyhow::Result<St
         parsed_email.message_id
     );
 
-    let msg = Message {
-        text: parsed_email.title + ": " + &parsed_email.body, // text = title + email body
-        convo_id: get_convo_id(&parsed_email.sender_email).await?, // convo_id = sender email address
-    };
+    // let msg = Message {
+    //     text: parsed_email.title + ": " + &parsed_email.body, // text = title + email body
+    //     convo_id: get_convo_id(&parsed_email.sender_email).await?, // convo_id = sender email address
+    // };
     // let resp = respond(msg.clone())
     //     .await
     //     .context("cannot calculate response")?;
     let resp = "Hi! My name is GephSupportBot. How can I help you today?".to_owned();
 
     // add question & response to db
-    DB.insert_msg(
-        &msg,
-        Platform::Email,
-        Role::User,
-        json!({ "sender": parsed_email.sender_email }),
-    )
-    .await?;
-    DB.insert_msg(
-        &Message {
-            text: resp.clone(),
-            convo_id: msg.convo_id,
-        },
-        Platform::Email,
-        Role::Assistant,
-        json!({"lol": "todo"}),
-    )
-    .await?;
+    // DB.insert_msg(
+    //     &msg,
+    //     Platform::Email,
+    //     Role::User,
+    //     json!({ "sender": parsed_email.sender_email }),
+    // )
+    // .await?;
+    // DB.insert_msg(
+    //     &Message {
+    //         text: resp.clone(),
+    //         convo_id: msg.convo_id,
+    //     },
+    //     Platform::Email,
+    //     Role::Assistant,
+    //     json!({"lol": "todo"}),
+    // )
+    // .await?;
 
     // send email response
     Ok(resp)
