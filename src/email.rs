@@ -29,7 +29,7 @@ pub async fn handle_email() -> () {
         |email: HashMap<String, String>| {
             smol::block_on(async {
                 match handle_email_inner(email).await {
-                    Ok(resp) => resp,
+                    Ok(()) => "Success".to_owned(),
                     Err(err) => format!("Our email bot encountered an error! {:?}\nPlease try sending your email again!", err),
                 }
             })
@@ -39,7 +39,7 @@ pub async fn handle_email() -> () {
     warp::serve(lol).run(([0, 0, 0, 0], 3030)).compat().await;
 }
 
-async fn handle_email_inner(email: HashMap<String, String>) -> anyhow::Result<String> {
+async fn handle_email_inner(email: HashMap<String, String>) -> anyhow::Result<()> {
     let parsed_email = parse_email(email)?;
     log::debug!(
         "title: {}\nbody: {}\nsender_name: {}\nsender_emal: {}\nmessage_id: {}",
@@ -79,7 +79,15 @@ async fn handle_email_inner(email: HashMap<String, String>) -> anyhow::Result<St
     // .await?;
 
     // send email response
-    Ok(resp)
+    send_email(
+        &("RE: ".to_owned() + &parsed_email.title),
+        &resp,
+        &parsed_email.sender_email,
+        &parsed_email.message_id,
+    )
+    .await?;
+
+    Ok(())
 }
 
 fn parse_email(email: HashMap<String, String>) -> anyhow::Result<ParsedEmail> {
