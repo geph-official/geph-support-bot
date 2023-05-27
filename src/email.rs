@@ -42,7 +42,7 @@ pub async fn handle_email() -> () {
 async fn handle_email_inner(email: HashMap<String, String>) -> anyhow::Result<()> {
     let parsed_email = parse_email(email)?;
     log::debug!(
-        "title: {}\nbody: {}\nsender_name: {}\nsender_emal: {}\nmessage_id: {}",
+        "title: {}\nbody: {}\nsender_name: {}\nsender_email: {}\nmessage_id: {}",
         parsed_email.title,
         parsed_email.body,
         parsed_email.sender_name,
@@ -83,7 +83,7 @@ async fn handle_email_inner(email: HashMap<String, String>) -> anyhow::Result<()
         &("RE: ".to_owned() + &parsed_email.title),
         &resp,
         &parsed_email.sender_email,
-        &parsed_email.message_id,
+        Some(&parsed_email.message_id),
     )
     .await?;
 
@@ -138,16 +138,25 @@ async fn get_convo_id(sender_email: &str) -> anyhow::Result<i64> {
     todo!()
 }
 
-async fn send_email(subject: &str, body: &str, to: &str, in_reply_to: &str) -> anyhow::Result<()> {
+async fn send_email(
+    subject: &str,
+    body: &str,
+    to: &str,
+    in_reply_to: Option<&str>,
+) -> anyhow::Result<()> {
     static MAILGUN_LIMIT: Lazy<Semaphore> = Lazy::new(|| Semaphore::new(16));
     let _guard = MAILGUN_LIMIT.acquire().await;
     log::info!("sending email!");
-    let params = [
+    let mut params = vec![
         ("from", "GephSupportBot <support@bot.geph.io>"),
         ("to", to),
         ("subject", subject),
         ("text", body),
     ];
+    if let Some(in_reply_to) = in_reply_to {
+        params.push(("h:In-Reply-To", in_reply_to));
+    }
+
     let base64_uname_pwd = base64::encode(format!("api:{}", CONFIG.mailgun_key));
     let auth_value = format!("Basic {}", base64_uname_pwd);
 
@@ -159,6 +168,6 @@ async fn send_email(subject: &str, body: &str, to: &str, in_reply_to: &str) -> a
         .send()
         .compat()
         .await?;
-    dbg!(res);
+    log::debug!("{:?}", res);
     Ok(())
 }
