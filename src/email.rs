@@ -157,10 +157,13 @@ async fn send_email(
         params.push(("h:In-Reply-To", in_reply_to));
     }
 
+    log::debug!("params = {:?}", params);
+
     let base64_uname_pwd = base64::encode(format!("api:{}", CONFIG.mailgun_key));
     let auth_value = format!("Basic {}", base64_uname_pwd);
 
     let client = reqwest::Client::new();
+    log::debug!("got a reqwest client!");
     let res = client
         .post("https://api.eu.mailgun.net/v3/bot.geph.io/messages")
         .header(header::AUTHORIZATION, auth_value)
