@@ -26,14 +26,12 @@ struct ParsedEmail {
 }
 
 pub async fn handle_email() -> () {
-    let lol = warp::path("support-bot-email").and(warp::body::form()).map(
-        |email: HashMap<String, String>| {
-            smol::block_on(async {
-                match handle_email_inner(email).await {
-                    Ok(()) => "Success".to_owned(),
-                    Err(err) => format!("Our email bot encountered an error! {:?}\nPlease try sending your email again!", err),
-                }
-            })
+    let lol = warp::path("support-bot-email").and(warp::body::form()).then(
+         |email: HashMap<String, String>| async move {
+            match handle_email_inner(email).await {
+                Ok(()) => "Success".to_owned(),
+                Err(err) => format!("Our email bot encountered an error! {:?}\nPlease try sending your email again!", err),
+            }
         },
     );
 
