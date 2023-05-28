@@ -49,14 +49,14 @@ async fn handle_email_inner(email: HashMap<String, String>) -> anyhow::Result<()
         parsed_email.message_id
     );
 
-    // let msg = Message {
-    //     text: parsed_email.title + ": " + &parsed_email.body, // text = title + email body
-    //     convo_id: get_convo_id(&parsed_email.sender_email).await?, // convo_id = sender email address
-    // };
-    // let resp = respond(msg.clone())
-    //     .await
-    //     .context("cannot calculate response")?;
-    let resp = "Hi! My name is GephSupportBot. How can I help you today?".to_owned();
+    let msg = Message {
+        text: parsed_email.title.clone() + ": " + &parsed_email.body, // text = title + email body
+        convo_id: get_convo_id(&parsed_email.sender_email).await?, // convo_id = sender email address
+    };
+    let resp = respond(msg.clone())
+        .await
+        .context("cannot calculate response")?;
+    // let resp = "Hi! My name is GephSupportBot. How can I help you today?".to_owned();
 
     // add question & response to db
     // DB.insert_msg(
