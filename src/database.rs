@@ -129,6 +129,20 @@ impl ChatHistoryDb {
         }
     }
 
+    /// Returns the convo id of an email thread, if it exists in the database
+    pub async fn email_metadata_to_id(&self, email_meta: Value) -> Option<i64> {
+        if let Ok(row) = sqlx::query("SELECT convo_id FROM conversations WHERE metadata=?")
+            .bind(email_meta)
+            .fetch_one(&self.db_pool)
+            .await
+        {
+            let id: i64 = row.get("convo_id");
+            Some(id)
+        } else {
+            None
+        }
+    }
+
     /// Returns all messages in DB with the given convo_id with sender info, as (sender, message)
     /// TODO: order of the messages
     pub async fn get_convo_history(&self, convo_id: i64) -> anyhow::Result<Vec<(String, String)>> {

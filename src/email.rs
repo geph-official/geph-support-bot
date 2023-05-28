@@ -5,7 +5,7 @@ use async_compat::CompatExt;
 use once_cell::sync::Lazy;
 use regex::Regex;
 use reqwest::header;
-use serde_json::json;
+use serde_json::{json, Value};
 use smol::lock::Semaphore;
 use smol_timeout::TimeoutExt;
 use warp::Filter;
@@ -51,7 +51,7 @@ async fn handle_email_inner(email: HashMap<String, String>) -> anyhow::Result<()
 
     let msg = Message {
         text: parsed_email.title.clone() + ": " + &parsed_email.body, // text = title + email body
-        convo_id: get_convo_id(&parsed_email.sender_email).await?, // convo_id = sender email address
+        convo_id: get_convo_id(make_email_metadata(&parsed_email.sender_email)).await?, // convo_id = sender email address
     };
     let resp = respond(msg.clone())
         .await
@@ -59,23 +59,23 @@ async fn handle_email_inner(email: HashMap<String, String>) -> anyhow::Result<()
     // let resp = "Hi! My name is GephSupportBot. How can I help you today?".to_owned();
 
     // add question & response to db
-    // DB.insert_msg(
-    //     &msg,
-    //     Platform::Email,
-    //     Role::User,
-    //     json!({ "sender": parsed_email.sender_email }),
-    // )
-    // .await?;
-    // DB.insert_msg(
-    //     &Message {
-    //         text: resp.clone(),
-    //         convo_id: msg.convo_id,
-    //     },
-    //     Platform::Email,
-    //     Role::Assistant,
-    //     json!({"lol": "todo"}),
-    // )
-    // .await?;
+    DB.insert_msg(
+        &msg,
+        Platform::Email,
+        Role::User,
+        make_email_metadata(&parsed_email.sender_email),
+    )
+    .await?;
+    DB.insert_msg(
+        &Message {
+            text: resp.clone(),
+            convo_id: msg.convo_id,
+        },
+        Platform::Email,
+        Role::Assistant,
+        make_email_metadata(&parsed_email.sender_email),
+    )
+    .await?;
 
     // send email response
     send_email(
@@ -132,9 +132,16 @@ fn parse_email(email: HashMap<String, String>) -> anyhow::Result<ParsedEmail> {
     })
 }
 
-async fn get_convo_id(sender_email: &str) -> anyhow::Result<i64> {
+async fn get_convo_id(email_metadata: Value) -> anyhow::Result<i64> {
     // sender is stored in the metadata field of each email conversation
-    todo!()
+    match DB.email_metadata_to_id(email_metadata).await {
+        Some(id) => Ok(id),
+        None => Ok(rand::random()),
+    }
+}
+
+fn make_email_metadata(user_email: &str) -> Value {
+    json!({ "user": user_email })
 }
 
 pub async fn send_email(
