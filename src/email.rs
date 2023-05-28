@@ -158,6 +158,7 @@ pub async fn send_email(
         ("to", to),
         ("subject", subject),
         ("text", body),
+        ("cc", "geph-emails@proton.me"),
     ];
     if let Some(in_reply_to) = in_reply_to {
         params.push(("h:In-Reply-To", in_reply_to));
