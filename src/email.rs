@@ -170,7 +170,6 @@ pub async fn send_email(
         .header(header::AUTHORIZATION, auth_value)
         .form(&params)
         .send()
-        .compat()
         .timeout(Duration::from_secs(10))
         .await;
     log::debug!("response from mailgun: {:?}", res);
