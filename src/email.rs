@@ -154,7 +154,7 @@ pub async fn send_email(
         ("text", body),
     ];
     if let Some(in_reply_to) = in_reply_to {
-        params.push(("h:Reply-To", in_reply_to));
+        params.push(("h:In-Reply-To", in_reply_to));
     }
 
     log::debug!("params = {:?}", params);
