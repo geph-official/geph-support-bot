@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, time::Duration};
 
 use anyhow::Context;
 use async_compat::CompatExt;
@@ -7,6 +7,7 @@ use regex::Regex;
 use reqwest::header;
 use serde_json::json;
 use smol::lock::Semaphore;
+use smol_timeout::TimeoutExt;
 use warp::Filter;
 
 use crate::{
@@ -170,8 +171,8 @@ pub async fn send_email(
         .form(&params)
         .send()
         .compat()
+        .timeout(Duration::from_secs(10))
         .await;
-    log::debug!("lol");
-    log::debug!("{:?}", res);
+    log::debug!("response from mailgun: {:?}", res);
     Ok(())
 }
