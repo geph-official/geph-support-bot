@@ -171,6 +171,7 @@ pub async fn send_email(
         .send()
         .compat()
         .await;
+    log::debug!("lol");
     log::debug!("{:?}", res);
     Ok(())
 }
