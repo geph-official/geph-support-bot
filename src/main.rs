@@ -54,20 +54,6 @@ static TELEGRAM: Lazy<TelegramBot> = Lazy::new(|| TelegramBot::new(&CONFIG.teleg
 
 fn main() {
     env_logger::init();
-    // smolscale::block_on(send_email(
-    //     "LOL",
-    //     "testing",
-    //     "thisbefruit@protonmail.com",
-    //     Some("<Op0N_ZWG9kJ94MhV7sZn8HQknrT7KomlM2wlgpfj__SWIgMRYUpzeMA06dXDI8AqvRNqKnx4FH_v2vEqSznlb6GspwdvtTgfPjl-kUkLlXc=@proton.me>
-    //     "),
-    // ));
     smolscale::spawn(handle_email()).detach();
     smolscale::block_on(handle_telegram());
-    // let s = include_str!("facts.txt");
-    // let lines = s.lines();
-    // smol::block_on(async {
-    //     for line in lines {
-    //         DB.insert_fact(line).await.unwrap();
-    //     }
-    // })
 }
