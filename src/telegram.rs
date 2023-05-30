@@ -90,7 +90,7 @@ pub async fn handle_telegram() {
                     {
                         let mut username = "";
                         let mut message = Message {
-                            text: msg.to_owned(),
+                            text: msg.replace(&("@".to_owned() + bot_uname), ""),
                             convo_id,
                         };
                         if let Some(uname) = update["message"]["from"]["username"].as_str() {

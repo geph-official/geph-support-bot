@@ -57,7 +57,6 @@ async fn handle_email_inner(email: HashMap<String, String>) -> anyhow::Result<()
         .await
         .context("cannot calculate response")?;
     let resp = resp + "\n\n" + &CONFIG.email_config.as_ref().unwrap().signature;
-    // let resp = "Hi! My name is GephSupportBot. How can I help you today?".to_owned();
 
     // add question & response to db
     DB.insert_msg(

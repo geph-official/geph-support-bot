@@ -1,3 +1,4 @@
+mod actions;
 mod database;
 mod email;
 mod learn;
