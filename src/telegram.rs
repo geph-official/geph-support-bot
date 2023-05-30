@@ -9,10 +9,8 @@ use crate::{
     database::{Platform, Role},
     learn::learn,
     responder::respond,
-    Message, DB, TELEGRAM,
+    Message, CONFIG, DB,
 };
-
-const ADMIN_UNAME: &str = "nullchinchilla";
 
 /// A client of the Telegram bot API.
 pub struct TelegramBot {
@@ -61,11 +59,14 @@ impl TelegramBot {
 }
 
 pub async fn handle_telegram() {
+    let telegram = TelegramBot::new(&CONFIG.telegram_config.as_ref().unwrap().telegram_token);
+    let admin_uname = &CONFIG.telegram_config.as_ref().unwrap().admin_uname;
+    let bot_uname = &CONFIG.telegram_config.as_ref().unwrap().bot_uname;
     let mut counter = 0;
     loop {
         log::info!("getting updates at {counter}");
         let fallible = async {
-            let updates = TELEGRAM
+            let updates = telegram
                 .call_api(
                     "getUpdates",
                     json!({"timeout": 120, "offset": counter + 1, "allowed_updates": []}),
@@ -82,9 +83,9 @@ pub async fn handle_telegram() {
                         .as_str()
                         .context("cannot parse out text")?;
                     log::info!("msg = {msg}");
-                    if msg.contains("@GephSupportBot")
+                    if msg.contains(&("@".to_owned() + bot_uname))
                         || update["message"]["reply_to_message"]["from"]["username"].as_str()
-                            == Some("GephSupportBot")
+                            == Some(bot_uname)
                         || update["message"]["chat"]["type"].as_str() == Some("private")
                     {
                         let mut username = "";
@@ -97,7 +98,7 @@ pub async fn handle_telegram() {
                             message.text = uname.to_owned() + ": " + &message.text;
                         };
                         // learn if the chat is from the admin & contains "#learn"
-                        let resp = if username == ADMIN_UNAME && message.text.contains("#learn") {
+                        let resp = if username == admin_uname && message.text.contains("#learn") {
                             learn(message.clone()).await?
                         } else {
                             respond(message.clone())
@@ -134,7 +135,7 @@ pub async fn handle_telegram() {
                                 .as_i64()
                                 .context("could not get message_id")?,
                         );
-                        TELEGRAM
+                        telegram
                             .call_api("sendMessage", json_resp)
                             .await
                             .context("cannot send reply back to telegram")?;

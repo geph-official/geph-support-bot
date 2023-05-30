@@ -56,7 +56,7 @@ async fn handle_email_inner(email: HashMap<String, String>) -> anyhow::Result<()
     let resp = respond(msg.clone())
         .await
         .context("cannot calculate response")?;
-    let resp = resp + "\n\n--- Geph Support Bot (find me on Telegram @GephSupportBot)";
+    let resp = resp + "\n\n" + &CONFIG.email_config.as_ref().unwrap().signature;
     // let resp = "Hi! My name is GephSupportBot. How can I help you today?".to_owned();
 
     // add question & response to db
@@ -155,11 +155,14 @@ pub async fn send_email(
     let _guard = MAILGUN_LIMIT.acquire().await;
     log::info!("sending email!");
     let mut params = vec![
-        ("from", "GephSupportBot <support@bot.geph.io>"),
+        (
+            "from",
+            CONFIG.email_config.as_ref().unwrap().address.as_str(),
+        ),
         ("to", to),
         ("subject", subject),
         ("text", body),
-        ("cc", "geph-emails@proton.me"),
+        ("cc", CONFIG.email_config.as_ref().unwrap().cc.as_str()),
     ];
     if let Some(in_reply_to) = in_reply_to {
         params.push(("h:In-Reply-To", in_reply_to));
@@ -167,13 +170,15 @@ pub async fn send_email(
 
     log::debug!("params = {:?}", params);
 
-    let base64_uname_pwd = base64::encode(format!("api:{}", CONFIG.mailgun_key));
+    let base64_uname_pwd = base64::encode(format!(
+        "api:{}",
+        CONFIG.email_config.as_ref().unwrap().mailgun_key
+    ));
     let auth_value = format!("Basic {}", base64_uname_pwd);
 
     let client = reqwest::Client::new();
-    log::debug!("got a reqwest client!");
     let res = client
-        .post("https://api.eu.mailgun.net/v3/bot.geph.io/messages")
+        .post(&CONFIG.email_config.as_ref().unwrap().mailgun_url)
         .header(header::AUTHORIZATION, auth_value)
         .form(&params)
         .send()

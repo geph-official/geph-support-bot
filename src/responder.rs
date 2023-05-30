@@ -32,11 +32,11 @@ pub async fn respond(msg: Message) -> anyhow::Result<String> {
     let latest_msg = ("user".to_owned(), msg.text.replace("@GephSupportBot", ""));
     role_contents.push(latest_msg);
     let resp_string = call_openai_api("gpt-4", &prompt, &role_contents)
-        // .or(async {
-        //     smol::Timer::after(Duration::from_secs(30)).await;
-        //     log::warn!("FALLBACK to gpt-3.5");
-        //     call_openai_api("gpt-3.5-turbo", &prompt, &role_contents).await
-        // })
+        .or(async {
+            smol::Timer::after(Duration::from_secs(500)).await; // if gpt-4 doesn't respond in under 5 minutes, fall back to gpt-3.5
+            log::warn!("FALLBACK to gpt-3.5"); // this is to handle the situation where OpenAI rate-limits gpt-4
+            call_openai_api("gpt-3.5-turbo", &prompt, &role_contents).await
+        })
         .await?;
 
     let resp: AiResponse = serde_json::from_str(&resp_string).unwrap_or_else(|_| AiResponse {
@@ -44,6 +44,7 @@ pub async fn respond(msg: Message) -> anyhow::Result<String> {
         text: resp_string.clone(),
     });
     log::debug!("AiResponse = {:?}", resp);
+
     // perform the action
     match resp.action {
         Action::Null => {}
@@ -61,7 +62,8 @@ pub async fn respond(msg: Message) -> anyhow::Result<String> {
 
 async fn transfer_plus(old_uname: &str, new_uname: &str) -> anyhow::Result<()> {
     log::debug!("transfer_plus({old_uname}, {new_uname})");
-    let mut conn = PgConnection::connect(&CONFIG.binder_db).await?;
+    let mut conn =
+        PgConnection::connect(&CONFIG.actions_config.as_ref().unwrap().binder_db).await?;
     log::debug!("connected to binder!");
     let res = sqlx::query("update subscriptions set id = (select id from users_legacy where username=$1) where id = (select id from users_legacy where username=$2)")
     .bind(new_uname)
