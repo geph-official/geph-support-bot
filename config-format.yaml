@@ -1,0 +1,28 @@
+history_db: absolute path to where to put the bot's conversations database
+
+llm_config:
+  openai_key: OpenAI API key
+  # both main_model and fallback_model must be specified in OpenAI's API format
+  main_model: main model used for the bot (gpt-4 recommended)
+  fallback_model: optional field. Falls back to this model 
+  if the main_model doesn't reply in 5 minutes (gpt-3.5-turbo recommended)
+
+# to disable telegram support, comment out the entire telegram_config block
+telegram_config:
+  telegram_token: the telegram bot's secret token
+  admin_uname: the bot admin's telegram username, without @
+  bot_uname: username of the bot
+
+# to disable email support, comment out the entire email_config block
+email_config: 
+  mailgun_url: email sending url for Mailgun
+  mailgun_key: Mailgun API key
+  address: email address to send emails from with Mailgun
+  signature: signature placed at the end of emails
+  cc: optional field. Email address to forward all emails to
+
+# to disable actions, comment out the entire actions_config block
+actions_config:
+    # this block is for putting all info needed for actions 
+    # to be performed by the bot. You can add actions by
+    # editing the source code.
