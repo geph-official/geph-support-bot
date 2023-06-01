@@ -27,10 +27,17 @@ struct Args {
 #[derive(Serialize, Deserialize, Clone)]
 struct Config {
     history_db: String,
-    openai_key: String,
+    llm_config: LlmConfig,
     telegram_config: Option<TelegramConfig>,
     email_config: Option<EmailConfig>,
     actions_config: Option<ActionsConfig>,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+struct LlmConfig {
+    openai_key: String,
+    main_model: String,
+    fallback_model: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -46,7 +53,7 @@ struct EmailConfig {
     mailgun_key: String,
     address: String,
     signature: String,
-    cc: String,
+    cc: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Clone)]

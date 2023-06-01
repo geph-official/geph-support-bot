@@ -155,16 +155,18 @@ pub async fn send_email(
     log::info!("sending email!");
     let mut params = vec![
         (
-            "from",
-            CONFIG.email_config.as_ref().unwrap().address.as_str(),
+            "from".to_string(),
+            CONFIG.email_config.as_ref().unwrap().address.clone(),
         ),
-        ("to", to),
-        ("subject", subject),
-        ("text", body),
-        ("cc", CONFIG.email_config.as_ref().unwrap().cc.as_str()),
+        ("to".to_string(), to.to_string()),
+        ("subject".to_string(), subject.to_string()),
+        ("text".to_string(), body.to_string()),
     ];
+    if let Some(cc) = CONFIG.email_config.as_ref().unwrap().cc.clone() {
+        params.push(("cc".to_string(), cc));
+    }
     if let Some(in_reply_to) = in_reply_to {
-        params.push(("h:In-Reply-To", in_reply_to));
+        params.push(("h:In-Reply-To".to_string(), in_reply_to.to_string()));
     }
 
     log::debug!("params = {:?}", params);

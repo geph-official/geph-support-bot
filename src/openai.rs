@@ -23,7 +23,10 @@ pub async fn call_openai_api(
 
     let mut resp: Value = Request::post("https://api.openai.com/v1/chat/completions")
         .header("Content-Type", "application/json")
-        .header("Authorization", "Bearer ".to_string() + &CONFIG.openai_key)
+        .header(
+            "Authorization",
+            "Bearer ".to_string() + &CONFIG.llm_config.openai_key,
+        )
         .body(serde_json::to_vec(&req)?)?
         .send_async()
         .await?
