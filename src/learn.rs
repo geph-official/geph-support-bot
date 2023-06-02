@@ -15,7 +15,7 @@ pub async fn learn(msg: Message) -> anyhow::Result<String> {
     let role_contents = format_learn_material(role_contents);
     // log::debug!("learn material: {:?}", role_contents);
     // call llm
-    let resp = call_openai_api("gpt-4", &prompt, &role_contents).await?;
+    let resp = call_openai_api(&CONFIG.llm_config.main_model, &prompt, &role_contents).await?;
     log::debug!("WHAT I LEARNED: {resp}");
     // add to facts db
     DB.insert_fact(&resp).await?;
