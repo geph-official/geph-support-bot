@@ -105,40 +105,41 @@ pub async fn handle_telegram() {
                                 .await
                                 .context("cannot calculate response")?
                         };
+                        if resp != "".to_string() {
+                            // add question & response to db
+                            DB.insert_msg(
+                                &message,
+                                Platform::Telegram,
+                                Role::User,
+                                json!({"lol": "todo"}),
+                            )
+                            .await?;
+                            DB.insert_msg(
+                                &Message {
+                                    text: resp.clone(),
+                                    convo_id: message.convo_id,
+                                },
+                                Platform::Telegram,
+                                Role::Assistant,
+                                json!({"lol": "todo"}),
+                            )
+                            .await?;
 
-                        // add question & response to db
-                        DB.insert_msg(
-                            &message,
-                            Platform::Telegram,
-                            Role::User,
-                            json!({"lol": "todo"}),
-                        )
-                        .await?;
-                        DB.insert_msg(
-                            &Message {
-                                text: resp.clone(),
-                                convo_id: message.convo_id,
-                            },
-                            Platform::Telegram,
-                            Role::Assistant,
-                            json!({"lol": "todo"}),
-                        )
-                        .await?;
-
-                        // send response to telegram
-                        let json_resp = telegram_json(
-                            resp,
-                            update["message"]["chat"]["id"]
-                                .as_i64()
-                                .context("could not get chat id")?,
-                            update["message"]["message_id"]
-                                .as_i64()
-                                .context("could not get message_id")?,
-                        );
-                        telegram
-                            .call_api("sendMessage", json_resp)
-                            .await
-                            .context("cannot send reply back to telegram")?;
+                            // send response to telegram
+                            let json_resp = telegram_json(
+                                resp,
+                                update["message"]["chat"]["id"]
+                                    .as_i64()
+                                    .context("could not get chat id")?,
+                                update["message"]["message_id"]
+                                    .as_i64()
+                                    .context("could not get message_id")?,
+                            );
+                            telegram
+                                .call_api("sendMessage", json_resp)
+                                .await
+                                .context("cannot send reply back to telegram")?;
+                        }
                     }
                 }
             }
@@ -156,19 +157,18 @@ pub async fn handle_telegram() {
 }
 
 async fn get_convo_id(update: Value) -> anyhow::Result<i64> {
-    // if update["message"]["chat"]["type"] == "private" {
-    update["message"]["chat"]["id"]
-        .as_i64()
-        .context("chat id could not be converted to i64")
-    // }
-    // } else {
-    //     if !update["message"]["reply_to_message"].is_null() {
-    //         if let Some(id) = DB.txt_to_id(&update["message"]["text"].to_string()).await {
-    //             return Ok(id);
-    //         }
-    //     }
-    //     Ok(rand::random())
-    // }
+    if update["message"]["chat"]["type"] == "private" {
+        update["message"]["chat"]["id"]
+            .as_i64()
+            .context("chat id could not be converted to i64")
+    } else {
+        if !update["message"]["reply_to_message"].is_null() {
+            if let Some(id) = DB.txt_to_id(&update["message"]["text"].to_string()).await {
+                return Ok(id);
+            }
+        }
+        Ok(rand::random())
+    }
 }
 
 // puts message into correct json format for telegram bot api

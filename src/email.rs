@@ -56,35 +56,38 @@ async fn handle_email_inner(email: HashMap<String, String>) -> anyhow::Result<()
     let resp = respond(msg.clone())
         .await
         .context("cannot calculate response")?;
-    let resp = resp + "\n\n" + &CONFIG.email_config.as_ref().unwrap().signature;
 
-    // add question & response to db
-    DB.insert_msg(
-        &msg,
-        Platform::Email,
-        Role::User,
-        make_email_metadata(&parsed_email.sender_email),
-    )
-    .await?;
-    DB.insert_msg(
-        &Message {
-            text: resp.clone(),
-            convo_id: msg.convo_id,
-        },
-        Platform::Email,
-        Role::Assistant,
-        make_email_metadata(&parsed_email.sender_email),
-    )
-    .await?;
+    if resp != "".to_string() {
+        let resp = resp + "\n\n" + &CONFIG.email_config.as_ref().unwrap().signature;
 
-    // send email response
-    send_email(
-        &("RE: ".to_owned() + &parsed_email.title),
-        &resp,
-        &parsed_email.sender_email,
-        Some(&parsed_email.message_id),
-    )
-    .await?;
+        // add question & response to db
+        DB.insert_msg(
+            &msg,
+            Platform::Email,
+            Role::User,
+            make_email_metadata(&parsed_email.sender_email),
+        )
+        .await?;
+        DB.insert_msg(
+            &Message {
+                text: resp.clone(),
+                convo_id: msg.convo_id,
+            },
+            Platform::Email,
+            Role::Assistant,
+            make_email_metadata(&parsed_email.sender_email),
+        )
+        .await?;
+
+        // send email response
+        send_email(
+            &("RE: ".to_owned() + &parsed_email.title),
+            &resp,
+            &parsed_email.sender_email,
+            Some(&parsed_email.message_id),
+        )
+        .await?;
+    }
 
     Ok(())
 }

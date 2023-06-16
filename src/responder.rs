@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use crate::{
-    actions::{self, transfer_plus, Action, AiResponse},
+    actions::{transfer_plus, Action, AiResponse},
     database::trim_convo_history,
     openai::{call_openai_api, get_chatbot_prompt},
     Message, CONFIG, DB,
@@ -47,6 +47,7 @@ pub async fn respond(msg: Message) -> anyhow::Result<String> {
             } => {
                 transfer_plus(&old_uname, &new_uname).await?;
             }
+            Action::Abort => return Ok("".to_string()),
         };
 
         Ok(resp.text)
