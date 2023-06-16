@@ -20,7 +20,7 @@ pub struct AiResponse {
 
 pub const ACTIONS_PROMPT: &str = r#"You *always* respond with a json struct of two fields. Some examples: 
 - {"action": {"TransferPlus": {"old_uname": "fdx", "new_uname": "FDX"}}, "text": "We have successfully transferred your Plus days to your new account!"}
-- {"action": "Null", "text": "Good morning! How can I help you with Geph today?"}
+- {"action": "Null", "text": "Good morning! How can I help you with Geph today? I know how to say things like\n - \"Hello\"\n - \"Goodbye\"\nand many other things."}
 
 These are the available actions and when/how you should use each one:
 1. "Null": this means do no action. Use this when you're regularly talking to the user
