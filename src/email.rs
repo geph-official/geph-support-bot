@@ -60,7 +60,7 @@ async fn handle_email_inner(email: HashMap<String, String>) -> anyhow::Result<()
 
     if resp != "".to_string() {
         let resp = format!(
-            "{}\n\n{}\n\n------- Original Message -------\nOn {}, {} {} wrote:\n\n{}",
+            "{}\n\n{}\n\n\n\n> ------- Original Message -------\nOn {}, {} <{}> wrote:\n\n{}",
             resp,
             &CONFIG.email_config.as_ref().unwrap().signature,
             parsed_email.date,
