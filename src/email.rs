@@ -23,6 +23,7 @@ struct ParsedEmail {
     sender_name: String,
     sender_email: String,
     message_id: String,
+    date: String,
 }
 
 pub async fn handle_email() -> () {
@@ -46,7 +47,7 @@ async fn handle_email_inner(email: HashMap<String, String>) -> anyhow::Result<()
         parsed_email.body,
         parsed_email.sender_name,
         parsed_email.sender_email,
-        parsed_email.message_id
+        parsed_email.message_id,
     );
 
     let msg = Message {
@@ -58,7 +59,15 @@ async fn handle_email_inner(email: HashMap<String, String>) -> anyhow::Result<()
         .context("cannot calculate response")?;
 
     if resp != "".to_string() {
-        let resp = resp + "\n\n" + &CONFIG.email_config.as_ref().unwrap().signature;
+        let resp = format!(
+            "{}\n\n{}\n\n------- Original Message -------\nOn {}, {} {} wrote:\n\n{}",
+            resp,
+            &CONFIG.email_config.as_ref().unwrap().signature,
+            parsed_email.date,
+            parsed_email.sender_name,
+            parsed_email.sender_email,
+            parsed_email.body
+        );
 
         // add question & response to db
         DB.insert_msg(
@@ -109,6 +118,10 @@ fn parse_email(email: HashMap<String, String>) -> anyhow::Result<ParsedEmail> {
         .get("Message-Id")
         .unwrap_or(&"No Message-Id".to_string())
         .clone();
+    let date = email
+        .get("Date")
+        .unwrap_or(&"No Message-Id".to_string())
+        .clone();
 
     let re = Regex::new(r"^(?P<name>[^<]+)\s*<(?P<email>[^>]+)>$").unwrap();
     let captures = re.captures(&sender).context("cannot parse sender")?;
@@ -132,6 +145,7 @@ fn parse_email(email: HashMap<String, String>) -> anyhow::Result<ParsedEmail> {
         sender_name,
         sender_email,
         message_id,
+        date,
     })
 }
 
