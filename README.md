@@ -68,7 +68,7 @@ Once you've gathered the required pieces, set up the bot with the following step
 1. Set up GephSupportBot on your server per the steps outlined earlier
 2. Fill in the `email_config` block of GephSupportBot's `config.yaml`
 4. Add your domain to Mailgun and set up Mailgun as the mail server for your domain: see [this tutorial](https://help.mailgun.com/hc/en-us/articles/203637190-How-Do-I-Add-or-Delete-a-Domain-)
-5. Set up a Mailgun route for receiving emails and forwarding them to GephSupportBot. If you want to forward all the received emails to another email address to make monitoring the bot easier, add that address to the route as well. See [this tutorial](https://help.mailgun.com/hc/en-us/articles/360011355893-How-Do-I-Setup-a-Route-#:~:text=First%2C%20log%20in%20to%20the,right%20portion%20of%20the%20page.).
+5. Set up a Mailgun route for receiving emails and forwarding them to GephSupportBot. With email enabled, GephSupportBot has an http server listening at `[your-domain]:3030/support-bot-email`. If you want to forward all the received emails to another email address to make monitoring the bot easier, add that address to the route as well. See [this tutorial](https://help.mailgun.com/hc/en-us/articles/360011355893-How-Do-I-Setup-a-Route-#:~:text=First%2C%20log%20in%20to%20the,right%20portion%20of%20the%20page.).
 6. Test that everything works!
 
 ## Adding support for new platforms
