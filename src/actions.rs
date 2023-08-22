@@ -40,6 +40,10 @@ pub async fn transfer_plus(old_uname: &str, new_uname: &str) -> anyhow::Result<(
     .bind(new_uname)
     .bind(old_uname).
     execute(&mut conn).await?;
+    let res2 = sqlx::query("update recurring_subs set user_id = (select id from users_legacy where username=$1) where user_id = (select id from users_legacy where username=$2)")
+    .bind(new_uname)
+    .bind(old_uname).
+    execute(&mut conn).await?;
     log::debug!("{} rows affected!", res.rows_affected());
     Ok(())
 }
