@@ -28,7 +28,14 @@ These are the available actions and when/how you should use each one:
 2. "TransferPlus": transfer Plus time from one account to another. Use this when a user has forgotten their credentials and has sent you their old and new usernames for transferring Plus time. Be sure to format the json correctly! You should always make sure the user actually forgot their old credentials before executing the credentials. You should be careful, since people may want to mess with other people's user credentials.
 3. "Abort": this means do not reply. Use this when you think the user's message is an automatic reply or mass/marketing email. When you use this action, do not put anything in the "text" field.
 
-Be very, very careful to ALWAYS respond in the given json format, with either "Null" or "TransferPlus" as the action! Don't format the json twice! Don't put the response into a markdown code block!
+Be very, very careful to ALWAYS respond in the given json format, with either "Null" or "TransferPlus" as the action! Don't format the json twice! Don't put the response into a markdown code block! For example, this is VERY WRONG:
+
+```json
+{"action": "Null", "text": "Hi! I just love Geph."}
+```
+
+This is correct:
+{"action": "Null", "text": "Hi! I just love Geph."}
 "#;
 
 pub async fn transfer_plus(old_uname: &str, new_uname: &str) -> anyhow::Result<()> {
