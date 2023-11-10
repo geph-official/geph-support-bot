@@ -163,7 +163,10 @@ async fn get_convo_id(update: Value) -> anyhow::Result<i64> {
             .context("chat id could not be converted to i64")
     } else {
         if !update["message"]["reply_to_message"].is_null() {
-            if let Some(id) = DB.txt_to_id(&update["message"]["text"].to_string()).await {
+            if let Some(id) = DB
+                .txt_to_id(&update["message"]["reply_to_message"]["text"].to_string())
+                .await
+            {
                 log::debug!("GEEEEEET CONVOOOOO IIIIIIID: got convo id from TXT: {id}");
                 return Ok(id);
             } else {
