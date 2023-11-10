@@ -164,7 +164,11 @@ async fn get_convo_id(update: Value) -> anyhow::Result<i64> {
     } else {
         if !update["message"]["reply_to_message"].is_null() {
             if let Some(id) = DB
-                .txt_to_id(&update["message"]["reply_to_message"]["text"].to_string())
+                .txt_to_id(
+                    update["message"]["reply_to_message"]["text"]
+                        .as_str()
+                        .context("could not get reply_to_message text")?,
+                )
                 .await
             {
                 log::debug!("GEEEEEET CONVOOOOO IIIIIIID: got convo id from TXT: {id}");
@@ -172,7 +176,9 @@ async fn get_convo_id(update: Value) -> anyhow::Result<i64> {
             } else {
                 log::debug!(
                     "GEEEEEET CONVOOOOO IIIIIIID: could not get convo_id associated with msg {}",
-                    &update["message"]["reply_to_message"]["text"].to_string()
+                    update["message"]["reply_to_message"]["text"]
+                        .as_str()
+                        .context("could not get reply_to_message text")?
                 );
             }
         }

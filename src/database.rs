@@ -117,7 +117,7 @@ impl ChatHistoryDb {
 
     /// Returns the convo id of a message if it exists in the database
     pub async fn txt_to_id(&self, text: &str) -> Option<i64> {
-        match sqlx::query("SELECT convo_id FROM messages WHERE text=\"?\"")
+        match sqlx::query("SELECT convo_id FROM messages WHERE text=?")
             .bind(text)
             .fetch_one(&self.db_pool)
             .await
