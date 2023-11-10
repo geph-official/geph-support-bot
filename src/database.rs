@@ -117,15 +117,19 @@ impl ChatHistoryDb {
 
     /// Returns the convo id of a message if it exists in the database
     pub async fn txt_to_id(&self, text: &str) -> Option<i64> {
-        if let Ok(row) = sqlx::query("SELECT convo_id FROM messages WHERE text=\"?\"")
+        match sqlx::query("SELECT convo_id FROM messages WHERE text=\"?\"")
             .bind(text)
             .fetch_one(&self.db_pool)
             .await
         {
-            let id: i64 = row.get("convo_id");
-            Some(id)
-        } else {
-            None
+            Ok(row) => {
+                let id: i64 = row.get("convo_id");
+                Some(id)
+            }
+            Err(e) => {
+                log::debug!("OH NO GETTING CONVO ID FROM TEXT FAILED: {e}");
+                None
+            }
         }
     }
 
