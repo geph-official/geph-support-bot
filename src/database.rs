@@ -126,10 +126,7 @@ impl ChatHistoryDb {
                 let id: i64 = row.get("convo_id");
                 Some(id)
             }
-            Err(e) => {
-                log::debug!("OH NO GETTING CONVO ID FROM TEXT FAILED: {e}");
-                None
-            }
+            Err(_) => None,
         }
     }
 

@@ -171,18 +171,9 @@ async fn get_convo_id(update: Value) -> anyhow::Result<i64> {
                 )
                 .await
             {
-                log::debug!("GEEEEEET CONVOOOOO IIIIIIID: got convo id from TXT: {id}");
                 return Ok(id);
-            } else {
-                log::debug!(
-                    "GEEEEEET CONVOOOOO IIIIIIID: could not get convo_id associated with msg {}",
-                    update["message"]["reply_to_message"]["text"]
-                        .as_str()
-                        .context("could not get reply_to_message text")?
-                );
             }
         }
-        log::debug!("GEEEEEET CONVOOOOO IIIIIIID: generating random new convo id");
         Ok(rand::random())
     }
 }
