@@ -78,7 +78,7 @@ pub async fn handle_telegram() {
                 // we only support text msgs atm
                 counter = counter.max(update["update_id"].as_i64().unwrap_or_default());
                 if !update["message"]["text"].is_null() {
-                    let convo_id = get_convo_id(update.clone()).await.unwrap();
+                    let convo_id = get_convo_id(update.clone()).await?;
                     let msg = update["message"]["text"]
                         .as_str()
                         .context("cannot parse out text")?;
