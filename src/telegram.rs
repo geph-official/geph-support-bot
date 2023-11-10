@@ -172,7 +172,7 @@ async fn get_convo_id(update: Value) -> anyhow::Result<i64> {
             } else {
                 log::debug!(
                     "GEEEEEET CONVOOOOO IIIIIIID: could not get convo_id associated with msg {}",
-                    &update["message"]["text"].to_string()
+                    &update["message"]["reply_to_message"]["text"].to_string()
                 );
             }
         }
