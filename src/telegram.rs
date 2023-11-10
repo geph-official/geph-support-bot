@@ -165,6 +165,11 @@ async fn get_convo_id(update: Value) -> anyhow::Result<i64> {
         if !update["message"]["reply_to_message"].is_null() {
             if let Some(id) = DB.txt_to_id(&update["message"]["text"].to_string()).await {
                 return Ok(id);
+            } else {
+                log::debug!(
+                    "could not get convo_id associated with msg {}",
+                    &update["message"]["text"].to_string()
+                );
             }
         }
         Ok(rand::random())
