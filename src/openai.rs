@@ -2,7 +2,7 @@ use anyhow::Context;
 use isahc::{AsyncReadResponseExt, Request, RequestExt};
 use serde_json::{json, Value};
 
-use crate::{actions::ACTIONS_PROMPT, CONFIG, DB};
+use crate::CONFIG;
 
 pub async fn call_openai_api(
     model: &str,
@@ -48,12 +48,7 @@ pub async fn call_openai_api(
     }
 }
 
-pub async fn get_chatbot_prompt(actions_enabled: bool) -> anyhow::Result<String> {
-    let mut initial_prompt = include_str!("initial-prompt.txt").to_owned();
-    if actions_enabled {
-        initial_prompt = initial_prompt + ACTIONS_PROMPT;
-    }
-    let facts = DB.get_all_facts().await?.join("\n");
-    let ret = initial_prompt + "\n" + &facts;
-    Ok(ret)
+pub async fn get_chatbot_prompt() -> anyhow::Result<String> {
+    let prompt = include_str!("prompt.txt").to_owned();
+    Ok(prompt)
 }

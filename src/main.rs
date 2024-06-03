@@ -1,7 +1,5 @@
-mod actions;
 mod database;
 mod email;
-mod learn;
 mod openai;
 mod responder;
 mod telegram;
@@ -30,7 +28,6 @@ struct Config {
     llm_config: LlmConfig,
     telegram_config: Option<TelegramConfig>,
     email_config: Option<EmailConfig>,
-    actions_config: Option<ActionsConfig>,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -54,11 +51,6 @@ struct EmailConfig {
     address: String,
     signature: String,
     cc: Option<String>,
-}
-
-#[derive(Serialize, Deserialize, Clone)]
-struct ActionsConfig {
-    binder_db: String,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]

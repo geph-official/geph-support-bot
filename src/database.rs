@@ -60,32 +60,10 @@ impl ChatHistoryDb {
         )",
         )
         .await?;
-        conn.execute(
-            "CREATE TABLE IF NOT EXISTS facts (
-            fact TEXT
-        )",
-        )
-        .await?;
 
         Ok(Self {
             db_pool: SqlitePool::connect(db_path).await?,
         })
-    }
-
-    pub async fn insert_fact(&self, fact: &str) -> anyhow::Result<()> {
-        sqlx::query("INSERT INTO facts (fact) VALUES (?)")
-            .bind(fact)
-            .execute(&self.db_pool)
-            .await?;
-        Ok(())
-    }
-
-    pub async fn get_all_facts(&self) -> anyhow::Result<Vec<String>> {
-        let facts = sqlx::query("SELECT * FROM facts")
-            .fetch_all(&self.db_pool)
-            .await?;
-        let ret: Vec<String> = facts.iter().map(|row| row.get("fact")).collect();
-        Ok(ret)
     }
 
     pub async fn insert_msg(

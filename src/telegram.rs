@@ -7,7 +7,6 @@ use smol_timeout::TimeoutExt;
 
 use crate::{
     database::{Platform, Role},
-    learn::learn,
     responder::respond,
     Message, CONFIG, DB,
 };
@@ -60,7 +59,6 @@ impl TelegramBot {
 
 pub async fn handle_telegram() {
     let telegram = TelegramBot::new(&CONFIG.telegram_config.as_ref().unwrap().telegram_token);
-    let admin_uname = &CONFIG.telegram_config.as_ref().unwrap().admin_uname;
     let bot_uname = &CONFIG.telegram_config.as_ref().unwrap().bot_uname;
     let mut counter = 0;
     loop {
@@ -97,14 +95,9 @@ pub async fn handle_telegram() {
                             username = uname;
                             message.text = uname.to_owned() + ": " + &message.text;
                         };
-                        // learn if the chat is from the admin & contains "#learn"
-                        let resp = if username == admin_uname && message.text.contains("#learn") {
-                            learn(message.clone()).await?
-                        } else {
-                            respond(message.clone())
-                                .await
-                                .context("cannot calculate response")?
-                        };
+                        let resp = respond(message.clone())
+                            .await
+                            .context("cannot calculate response")?;
                         if resp != "".to_string() {
                             // add question & response to db
                             DB.insert_msg(
