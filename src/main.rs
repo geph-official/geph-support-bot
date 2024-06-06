@@ -3,6 +3,7 @@ mod email;
 mod openai;
 mod responder;
 mod telegram;
+mod tools;
 
 use std::path::PathBuf;
 

@@ -6,6 +6,7 @@ use crate::{
     Message, CONFIG, DB,
 };
 
+use serde_json::{json, Value};
 use smol::future::FutureExt;
 
 pub async fn respond(msg: Message) -> anyhow::Result<String> {
@@ -15,16 +16,20 @@ pub async fn respond(msg: Message) -> anyhow::Result<String> {
     let prompt = get_chatbot_prompt().await?;
     // chat history
     let mut role_contents = trim_convo_history(DB.get_convo_history(msg.convo_id).await?).await;
+    let input: Vec<Value> = role_contents
+        .iter()
+        .map(|(role, content)| json!({"role": role, "content": content}))
+        .collect();
     let latest_msg = ("user".to_owned(), msg.text);
     role_contents.push(latest_msg);
 
     let resp_string = match llm_config.fallback_model {
         Some(fallback_model) => {
-            call_openai_api(&llm_config.main_model, &prompt, &role_contents)
+            call_openai_api(&llm_config.main_model, &prompt, input.clone())
                 .or(async {
                     smol::Timer::after(Duration::from_secs(500)).await;
                     log::warn!("FALLBACK to {}", fallback_model);
-                    call_openai_api(&fallback_model, &prompt, &role_contents).await
+                    call_openai_api(&fallback_model, &prompt, input).await
                 })
                 .await?
         }
