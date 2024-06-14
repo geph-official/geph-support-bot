@@ -41,19 +41,19 @@ struct LlmConfig {
 }
 
 #[derive(Serialize, Deserialize, Clone)]
-struct TelegramConfig {
-    telegram_token: String,
-    admin_chat_id: i64,
-    bot_uname: String,
+pub struct TelegramConfig {
+    pub telegram_token: String,
+    pub admin_chat_id: i64,
+    pub bot_uname: String,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
-struct EmailConfig {
-    mailgun_url: String,
-    mailgun_key: String,
-    address: String,
-    signature: String,
-    cc: Option<String>,
+pub struct EmailConfig {
+    pub mailgun_url: String,
+    pub mailgun_key: String,
+    pub address: String,
+    pub signature: String,
+    pub cc: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
