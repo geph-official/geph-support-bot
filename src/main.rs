@@ -115,7 +115,9 @@ async fn run_bot(platform: impl Platform) {
     loop {
         let fallible = async {
             let IncomingMsg { text, from, msg_id } = platform.recv_msg().await;
+            log::debug!("received msg text={text}, from={from}, msg_id={msg_id}");
             let resp = generate_response(&from, &text).await?;
+            log::debug!("generated response! resp={resp}");
             platform
                 .send_msg(&OutgoingMsg {
                     text: resp,
@@ -123,6 +125,7 @@ async fn run_bot(platform: impl Platform) {
                     in_reply_to: Some(msg_id),
                 })
                 .await?;
+            log::debug!("sent off response!");
             anyhow::Ok(())
         };
         if let Err(e) = fallible.await {
