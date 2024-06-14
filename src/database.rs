@@ -50,7 +50,7 @@ impl ChatHistoryDb {
     pub async fn query(&self, sql: &str) -> anyhow::Result<String> {
         let rows = sqlx::query(sql).fetch_all(&self.db_pool).await?;
         let mut result_string = String::new();
-        result_string.push_str(&format!("{} rows\n", rows.len().to_string()));
+        result_string.push_str(&format!("{} rows\n", rows.len()));
 
         if let Some(first_row) = rows.first() {
             let columns = first_row.columns();
