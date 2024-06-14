@@ -9,15 +9,17 @@ use smol::Task;
 use smol_timeout::TimeoutExt;
 
 use crate::{
-    platform::{Platform, PlatformMsg},
+    platform::{IncomingMsg, Platform},
     TelegramConfig,
 };
+
+use super::OutgoingMsg;
 
 pub struct Telegram {
     token: String,
     client: isahc::HttpClient,
     _task: Task<()>,
-    recv_msgs: smol::channel::Receiver<PlatformMsg>,
+    recv_msgs: smol::channel::Receiver<IncomingMsg>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -85,7 +87,7 @@ impl Telegram {
                                     text = format!("From {uname}: \n{text}");
                                 };
                                 send_msgs
-                                    .send(PlatformMsg {
+                                    .send(IncomingMsg {
                                         text,
                                         from,
                                         msg_id: msg_id.to_string(),
@@ -144,27 +146,27 @@ async fn call_api(
 
 #[async_trait]
 impl Platform for Telegram {
-    async fn send_msg(&self, msg: &str, to: &str, in_reply_to: Option<&str>) -> anyhow::Result<()> {
+    async fn send_msg(&self, outgoing_msg: &OutgoingMsg) -> anyhow::Result<()> {
         let TelegramThread {
             chat_id,
             user_id: _,
-        } = serde_json::from_str(&to)?;
-        let json = match in_reply_to {
+        } = serde_json::from_str(&outgoing_msg.to)?;
+        let json = match outgoing_msg.in_reply_to.clone() {
             Some(id) => json!({
                 "chat_id": chat_id,
-                "text": msg,
+                "text": outgoing_msg.text.clone(),
                 "reply_to_message_id": id,
             }),
             None => json!({
                 "chat_id": chat_id,
-                "text": msg,
+                "text": outgoing_msg.text.clone(),
             }),
         };
         call_api("sendMessage", json, &self.client, &self.token).await?;
         Ok(())
     }
 
-    async fn recv_msg(&self) -> PlatformMsg {
+    async fn recv_msg(&self) -> IncomingMsg {
         self.recv_msgs.recv().await.unwrap()
     }
 }

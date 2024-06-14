@@ -11,15 +11,17 @@ use smol_timeout::TimeoutExt;
 use warp::Filter;
 
 use crate::{
-    platform::{Platform, PlatformMsg},
+    platform::{IncomingMsg, Platform},
     EmailConfig,
 };
+
+use super::OutgoingMsg;
 
 pub struct Email {
     config: EmailConfig,
     client: Client,
     _task: Task<()>,
-    recv_msgs: smol::channel::Receiver<PlatformMsg>,
+    recv_msgs: smol::channel::Receiver<IncomingMsg>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -60,22 +62,22 @@ impl Email {
 
 #[async_trait]
 impl Platform for Email {
-    async fn send_msg(&self, msg: &str, to: &str, in_reply_to: Option<&str>) -> anyhow::Result<()> {
-        let EmailMsg { title, body } = serde_json::from_str(&msg)?;
+    async fn send_msg(&self, outgoing_msg: &OutgoingMsg) -> anyhow::Result<()> {
+        let EmailMsg { title, body } = serde_json::from_str(&outgoing_msg.text)?;
         let title = "RE: ".to_owned() + &title;
 
         static MAILGUN_LIMIT: Lazy<Semaphore> = Lazy::new(|| Semaphore::new(16));
         let _guard = MAILGUN_LIMIT.acquire().await;
         let mut params = vec![
             ("from".to_string(), self.config.address.clone()),
-            ("to".to_string(), to.to_string()),
+            ("to".to_string(), outgoing_msg.to.to_string()),
             ("subject".to_string(), title),
             ("text".to_string(), body),
         ];
         if let Some(cc) = self.config.cc.clone() {
             params.push(("cc".to_string(), cc));
         }
-        if let Some(in_reply_to) = in_reply_to {
+        if let Some(in_reply_to) = outgoing_msg.in_reply_to.clone() {
             params.push(("h:In-Reply-To".to_string(), in_reply_to.to_string()));
         }
 
@@ -97,12 +99,12 @@ impl Platform for Email {
         Ok(())
     }
 
-    async fn recv_msg(&self) -> PlatformMsg {
+    async fn recv_msg(&self) -> IncomingMsg {
         self.recv_msgs.recv().await.unwrap()
     }
 }
 
-fn parse_email(email: HashMap<String, String>) -> anyhow::Result<PlatformMsg> {
+fn parse_email(email: HashMap<String, String>) -> anyhow::Result<IncomingMsg> {
     let title = email
         .get("subject")
         .unwrap_or(&"Unknown Subject".to_string())
@@ -122,7 +124,7 @@ fn parse_email(email: HashMap<String, String>) -> anyhow::Result<PlatformMsg> {
         .unwrap_or(&"No Message-Id".to_string())
         .clone();
 
-    Ok(PlatformMsg { text, from, msg_id })
+    Ok(IncomingMsg { text, from, msg_id })
 
     // let date = email
     //     .get("Date")

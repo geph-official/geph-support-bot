@@ -4,15 +4,19 @@ mod platform;
 mod responder;
 mod tools;
 
-use std::path::PathBuf;
+use std::{collections::HashMap, path::PathBuf, sync::RwLock};
 
 use argh::FromArgs;
 use database::ChatHistoryDb;
 // use email::handle_email;
 use once_cell::sync::Lazy;
-use platform::{Email, Platform, PlatformMsg, Telegram};
+use platform::{Email, IncomingMsg, OutgoingMsg, Platform, Telegram};
 use responder::generate_response;
 use serde::{Deserialize, Serialize};
+use smol::{
+    channel::{Receiver, Sender},
+    future::FutureExt,
+};
 // use telegram::{handle_telegram, TelegramBot};
 
 /// A tool to run the Geph support bot.
@@ -28,8 +32,8 @@ struct Args {
 struct Config {
     history_db: String,
     llm_config: LlmConfig,
-    telegram_config: Option<TelegramConfig>,
-    email_config: Option<EmailConfig>,
+    telegram_config: TelegramConfig,
+    email_config: EmailConfig,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -74,19 +78,19 @@ static DB: Lazy<ChatHistoryDb> = Lazy::new(|| {
         .expect("cannot create chat history db")
 });
 
-// static TELEGRAM: Lazy<TelegramBot> =
-//     Lazy::new(|| TelegramBot::new(&CONFIG.telegram_config.as_ref().unwrap().telegram_token));
+static BIG_TABLE: Lazy<RwLock<HashMap<String, Sender<OutgoingMsg>>>> =
+    Lazy::new(|| RwLock::new(HashMap::new()));
 
 fn main() {
     env_logger::init();
 
-    if let Some(config) = CONFIG.email_config.as_ref() {
-        smolscale::spawn(run_bot(Email::new(config))).detach();
-    }
+    let email_config = CONFIG.email_config.clone();
+    let email = Email::new(&email_config);
 
-    if let Some(config) = CONFIG.telegram_config.as_ref() {
-        smolscale::block_on(run_bot(Telegram::new(config)))
-    }
+    let telegram_config = CONFIG.telegram_config.clone();
+    let telegram = Telegram::new(&telegram_config);
+
+    smolscale::block_on(async { run_bot(email).race(run_bot(telegram)).await });
 
     // match smolscale::block_on(DB.add_msg(
     //     "lol",
@@ -119,15 +123,42 @@ fn main() {
 }
 
 async fn run_bot(platform: impl Platform) {
-    loop {
-        let fallible = async {
-            let PlatformMsg { text, from, msg_id } = platform.recv_msg().await;
-            let resp = generate_response(&from, &text).await?;
-            platform.send_msg(&resp, &from, Some(&msg_id)).await?;
-            anyhow::Ok(())
-        };
-        if let Err(e) = fallible.await {
-            log::error!("run_bot failed with err = {e}")
+    // start loop to read outgoing messages to this platform from the channel
+    let (send_out, recv_out) = smol::channel::unbounded();
+    let forward_outmsg_loop = async {
+        loop {
+            let fallible = async {
+                let msg: OutgoingMsg = recv_out.recv().await?;
+                platform.send_msg(&msg).await?;
+                anyhow::Ok(())
+            };
+            if let Err(e) = fallible.await {
+                log::error!("run_bot failed with err = {e}")
+            }
         }
-    }
+    };
+    let respond_loop = async {
+        loop {
+            let fallible = async {
+                let IncomingMsg { text, from, msg_id } = platform.recv_msg().await;
+                BIG_TABLE
+                    .write()
+                    .unwrap()
+                    .insert(from.clone(), send_out.clone());
+                let resp = generate_response(&from, &text).await?;
+                platform
+                    .send_msg(&OutgoingMsg {
+                        text: resp,
+                        to: from,
+                        in_reply_to: Some(msg_id),
+                    })
+                    .await?;
+                anyhow::Ok(())
+            };
+            if let Err(e) = fallible.await {
+                log::error!("run_bot failed with err = {e}")
+            }
+        }
+    };
+    respond_loop.race(forward_outmsg_loop).await;
 }
