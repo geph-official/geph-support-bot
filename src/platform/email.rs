@@ -64,6 +64,7 @@ impl Email {
 impl Platform for Email {
     async fn send_msg(&self, outgoing_msg: &OutgoingMsg) -> anyhow::Result<()> {
         let EmailMsg { title, body } = serde_json::from_str(&outgoing_msg.text)?;
+        log::debug!("title={title}, body={body}");
         let title = "RE: ".to_owned() + &title;
 
         static MAILGUN_LIMIT: Lazy<Semaphore> = Lazy::new(|| Semaphore::new(16));
