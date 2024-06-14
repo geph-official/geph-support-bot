@@ -1,5 +1,6 @@
-use std::{collections::HashMap, time::Duration};
+use std::{collections::HashMap, sync::RwLock, time::Duration};
 
+use anyhow::Context;
 use async_compat::CompatExt;
 use async_trait::async_trait;
 use isahc::http;
@@ -21,7 +22,8 @@ pub struct Email {
     config: EmailConfig,
     client: Client,
     _task: Task<()>,
-    recv_msgs: smol::channel::Receiver<IncomingMsg>,
+    recv_msgs: smol::channel::Receiver<(IncomingMsg, String)>,
+    email_to_title: RwLock<HashMap<String, String>>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -39,8 +41,8 @@ impl Email {
                 let send_msgs = send_msgs.clone();
                 async move {
                     match parse_email(email) {
-                        Ok(msg) => {
-                            let _ = send_msgs.send(msg).await;
+                        Ok((msg, title)) => {
+                            let _ = send_msgs.send((msg, title)).await;
                             http::StatusCode::OK
                         }
                         Err(err) => {
@@ -56,6 +58,7 @@ impl Email {
             client: reqwest::Client::new(),
             _task,
             recv_msgs,
+            email_to_title: RwLock::new(HashMap::new()),
         }
     }
 }
@@ -63,9 +66,13 @@ impl Email {
 #[async_trait]
 impl Platform for Email {
     async fn send_msg(&self, outgoing_msg: &OutgoingMsg) -> anyhow::Result<()> {
-        let EmailMsg { title, body } = serde_json::from_str(&outgoing_msg.text)?;
-        log::debug!("title={title}, body={body}");
-        let title = "RE: ".to_owned() + &title;
+        let title = "RE: ".to_owned()
+            + &self
+                .email_to_title
+                .read()
+                .unwrap()
+                .get(&outgoing_msg.to)
+                .context("no 'to' field in outgoing email msg")?;
 
         static MAILGUN_LIMIT: Lazy<Semaphore> = Lazy::new(|| Semaphore::new(16));
         let _guard = MAILGUN_LIMIT.acquire().await;
@@ -73,7 +80,7 @@ impl Platform for Email {
             ("from".to_string(), self.config.address.clone()),
             ("to".to_string(), outgoing_msg.to.to_string()),
             ("subject".to_string(), title),
-            ("text".to_string(), body),
+            ("text".to_string(), outgoing_msg.text.clone()),
         ];
         if let Some(cc) = self.config.cc.clone() {
             params.push(("cc".to_string(), cc));
@@ -101,11 +108,16 @@ impl Platform for Email {
     }
 
     async fn recv_msg(&self) -> IncomingMsg {
-        self.recv_msgs.recv().await.unwrap()
+        let (msg, title) = self.recv_msgs.recv().await.unwrap();
+        self.email_to_title
+            .write()
+            .unwrap()
+            .insert(msg.from.clone(), title);
+        msg
     }
 }
 
-fn parse_email(email: HashMap<String, String>) -> anyhow::Result<IncomingMsg> {
+fn parse_email(email: HashMap<String, String>) -> anyhow::Result<(IncomingMsg, String)> {
     let title = email
         .get("subject")
         .unwrap_or(&"Unknown Subject".to_string())
@@ -114,7 +126,10 @@ fn parse_email(email: HashMap<String, String>) -> anyhow::Result<IncomingMsg> {
         .get("body-plain")
         .unwrap_or(&"No Content".to_string())
         .clone();
-    let text = serde_json::to_string(&EmailMsg { title, body })?;
+    let text = serde_json::to_string(&EmailMsg {
+        title: title.clone(),
+        body,
+    })?;
 
     let from = email
         .get("from")
@@ -125,7 +140,7 @@ fn parse_email(email: HashMap<String, String>) -> anyhow::Result<IncomingMsg> {
         .unwrap_or(&"No Message-Id".to_string())
         .clone();
 
-    Ok(IncomingMsg { text, from, msg_id })
+    Ok((IncomingMsg { text, from, msg_id }, title))
 
     // let date = email
     //     .get("Date")
