@@ -80,44 +80,13 @@ fn main() {
     let telegram = Telegram::new(&CONFIG.telegram_config);
 
     smolscale::block_on(async { run_bot(email).race(run_bot(telegram)).await });
-
-    // match smolscale::block_on(DB.add_msg(
-    //     "lol",
-    //     ChatEntry::User {
-    //         content: "hey test".to_owned(),
-    //     },
-    // )) {
-    //     Ok(_) => println!("success"),
-    //     Err(e) => println!("ERR!!: {e}"),
-    // }
-
-    // match smolscale::block_on(call_openai_api(
-    //     "gpt-4-turbo",
-    //     include_str!("prompt.txt"),
-    //     vec![ChatEntry::User {
-    //         content: "hey how's it going".to_string(),
-    //     }],
-    // )) {
-    //     Ok(res) => println!("RESPONSE: {:#?}", res),
-    //     Err(e) => println!("ERR!!: {e}"),
-    // };
-
-    // let telegram = Telegram::new(CONFIG.telegram_config.as_ref().unwrap());
-    // smolscale::block_on(async move {
-    //     telegram
-    //         .send_msg("hey thisbe".to_string(), "802173924".to_string(), None)
-    //         .await
-    //         .unwrap()
-    // });
 }
 
 async fn run_bot(platform: impl Platform) {
     loop {
         let fallible = async {
             let IncomingMsg { text, from, msg_id } = platform.recv_msg().await;
-            log::debug!("received msg text={text}, from={from}, msg_id={msg_id}");
             let resp = generate_response(&from, &text).await?;
-            log::debug!("generated response! resp={resp}");
             platform
                 .send_msg(&OutgoingMsg {
                     text: resp,
@@ -125,7 +94,6 @@ async fn run_bot(platform: impl Platform) {
                     in_reply_to: Some(msg_id),
                 })
                 .await?;
-            log::debug!("sent off response!");
             anyhow::Ok(())
         };
         if let Err(e) = fallible.await {
