@@ -144,12 +144,7 @@ async fn call_api(
 
 #[async_trait]
 impl Platform for Telegram {
-    async fn send_msg(
-        &self,
-        msg: String,
-        to: String,
-        in_reply_to: Option<String>,
-    ) -> anyhow::Result<()> {
+    async fn send_msg(&self, msg: &str, to: &str, in_reply_to: Option<&str>) -> anyhow::Result<()> {
         let TelegramThread {
             chat_id,
             user_id: _,

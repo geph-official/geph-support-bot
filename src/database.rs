@@ -1,32 +1,7 @@
-use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sqlx::{Column, Connection, Executor, Row, SqliteConnection, SqlitePool};
 
 use crate::openai::ChatEntry;
-
-#[derive(Serialize, Deserialize, Clone, Debug)]
-#[serde(rename_all = "lowercase")]
-pub enum Role {
-    System,
-    User,
-    Assistant,
-    Tool,
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug)]
-pub enum Platform {
-    Telegram,
-    Email,
-}
-
-impl Platform {
-    pub fn to_string(&self) -> String {
-        match self {
-            Platform::Telegram => "telegram".to_owned(),
-            Platform::Email => "email".to_owned(),
-        }
-    }
-}
 
 pub struct ChatHistoryDb {
     db_pool: SqlitePool,
@@ -37,13 +12,6 @@ impl ChatHistoryDb {
     pub async fn new(db_path: &str) -> anyhow::Result<Self> {
         // create tables
         let mut conn = SqliteConnection::connect(&format!("file:{db_path}?mode=rwc")).await?;
-        // conn.execute(
-        //     "CREATE TABLE IF NOT EXISTS conversations (
-        //         convo_id BIGINT PRIMARY KEY,
-        //         metadata BLOB
-        //     )",
-        // )
-        // .await?;
         conn.execute(
             "CREATE TABLE IF NOT EXISTS chat_entries (
             thread BIGINT,
@@ -65,26 +33,6 @@ impl ChatHistoryDb {
             .await?;
         Ok(())
     }
-
-    // /// returns convo_id given conversation-specific metadata
-    // pub async fn get_or_insert_convo_id(&self, convo_metadata: Value) -> anyhow::Result<i64> {
-    //     let res: Option<(i64,)> =
-    //         sqlx::query_as("SELECT convo_id FROM conversations where metadata=$1")
-    //             .bind(convo_metadata.clone())
-    //             .fetch_optional(&self.db_pool)
-    //             .await?;
-    //     if let Some((convo_id,)) = res {
-    //         Ok(convo_id)
-    //     } else {
-    //         let convo_id: i64 = rand::random();
-    //         sqlx::query("INSERT INTO conversations (convo_id, metadata) VALUES ($1, $2)")
-    //             .bind(convo_id)
-    //             .bind(convo_metadata)
-    //             .execute(&self.db_pool)
-    //             .await?;
-    //         Ok(convo_id)
-    //     }
-    // }
 
     /// Returns all chat_entries in DB with the given sender
     pub async fn get_convo_history(&self, thread: &str) -> anyhow::Result<Vec<ChatEntry>> {

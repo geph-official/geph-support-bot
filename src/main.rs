@@ -1,9 +1,7 @@
 mod database;
-mod email;
 mod openai;
 mod platform;
 mod responder;
-mod telegram;
 mod tools;
 
 use std::path::PathBuf;
@@ -12,12 +10,9 @@ use argh::FromArgs;
 use database::ChatHistoryDb;
 // use email::handle_email;
 use once_cell::sync::Lazy;
-use openai::{call_openai_api, ChatEntry};
-use platform::{Platform, PlatformMsg};
+use platform::{Email, Platform, PlatformMsg, Telegram};
 use responder::generate_response;
 use serde::{Deserialize, Serialize};
-use serde_json::json;
-use telegram::Telegram;
 // use telegram::{handle_telegram, TelegramBot};
 
 /// A tool to run the Geph support bot.
@@ -85,6 +80,10 @@ static DB: Lazy<ChatHistoryDb> = Lazy::new(|| {
 fn main() {
     env_logger::init();
 
+    if let Some(config) = CONFIG.email_config.as_ref() {
+        smolscale::spawn(run_bot(Email::new(config))).detach();
+    }
+
     if let Some(config) = CONFIG.telegram_config.as_ref() {
         smolscale::block_on(run_bot(Telegram::new(config)))
     }
@@ -124,7 +123,7 @@ async fn run_bot(platform: impl Platform) {
         let fallible = async {
             let PlatformMsg { text, from, msg_id } = platform.recv_msg().await;
             let resp = generate_response(&from, &text).await?;
-            platform.send_msg(resp, from, Some(msg_id)).await?;
+            platform.send_msg(&resp, &from, Some(&msg_id)).await?;
             anyhow::Ok(())
         };
         if let Err(e) = fallible.await {

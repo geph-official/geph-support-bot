@@ -87,48 +87,6 @@ pub async fn call_openai_api(
         content,
         tool_calls,
     })
-
-    // if resp_msg["role"].is_string() {
-    //     match resp_msg["content"].as_str() {
-    //         Some(msg) => {
-    //             return Ok(OpenAiResponse::Message {
-    //                 content: msg.to_string(),
-    //             })
-    //         }
-    //         None => {
-    //             if let Ok(tool_calls) = resp_msg["tool_calls"]
-    //                 .as_array()
-    //                 .context("tool_calls is not an array")
-    //             {
-    //                 let ret: Vec<ToolCall> = tool_calls
-    //                     .iter()
-    //                     .map(|tool_call| {
-    //                         let name = tool_call["function"]["name"]
-    //                             .as_str()
-    //                             .context("function call has no name")
-    //                             .unwrap();
-    //                         let params_str = tool_call["function"]["arguments"]
-    //                             .as_str()
-    //                             .context("function call has no arguments")
-    //                             .unwrap();
-    //                         let tool_call_id =
-    //                             tool_call["id"].as_str().context("no tool_call.id").unwrap();
-    //                         ToolCall {
-    //                             tool_call_id: tool_call_id.to_string(),
-    //                             name: name.to_string(),
-    //                             params_str: params_str.to_string(),
-    //                         }
-    //                     })
-    //                     .collect();
-    //                 return Ok(OpenAiResponse::Tools(ret));
-    //             } else {
-    //                 anyhow::bail!("not tool_call but no msg content")
-    //             }
-    //         }
-    //     }
-    // } else {
-    //     anyhow::bail!("no role in response")
-    // }
 }
 
 pub fn get_tools() -> Vec<Value> {

@@ -95,9 +95,7 @@ pub struct ContactManager;
 #[derive(JsonSchema, Deserialize)]
 pub struct ContactManagerParams {
     msg: String,
-    req_convo_id: i64,
-    req_chat_id: i64,
-    req_reply_to_msg_id: i64,
+    req_thread: String,
 }
 
 impl Tool for ContactManager {
@@ -133,9 +131,7 @@ pub struct SendManagerResponse;
 #[derive(JsonSchema, Deserialize)]
 pub struct SendManagerResponseParams {
     manager_msg: String,
-    req_chat_id: i64,
-    req_convo_id: i64,
-    req_reply_to_msg_id: i64,
+    to_thread: String,
 }
 
 impl Tool for SendManagerResponse {
