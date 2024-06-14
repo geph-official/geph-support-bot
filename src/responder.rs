@@ -1,39 +1,71 @@
-use std::time::Duration;
-
 use crate::{
-    database::trim_convo_history,
-    openai::{call_openai_api, get_chatbot_prompt},
-    Message, CONFIG, DB,
+    openai::{call_openai_api, ChatEntry},
+    tools::TOOLS,
+    CONFIG, DB,
 };
 
-use serde_json::{json, Value};
-use smol::future::FutureExt;
+use anyhow::Context;
+use serde_json::Value;
 
-pub async fn respond(msg: Message) -> anyhow::Result<String> {
+pub async fn generate_response(thread: &str, user_input: &str) -> anyhow::Result<String> {
+    DB.add_msg(
+        thread,
+        ChatEntry::User {
+            content: user_input.to_string(),
+        },
+    )
+    .await?;
+
     let llm_config = CONFIG.llm_config.clone();
+    let prompt = include_str!("prompt.txt");
 
-    // prompt
-    let prompt = get_chatbot_prompt().await?;
-    // chat history
-    let mut role_contents = trim_convo_history(DB.get_convo_history(msg.convo_id).await?).await;
-    let input: Vec<Value> = role_contents
-        .iter()
-        .map(|(role, content)| json!({"role": role, "content": content}))
-        .collect();
-    let latest_msg = ("user".to_owned(), msg.text);
-    role_contents.push(latest_msg);
-
-    let resp_string = match llm_config.fallback_model {
-        Some(fallback_model) => {
-            call_openai_api(&llm_config.main_model, &prompt, input.clone())
-                .or(async {
-                    smol::Timer::after(Duration::from_secs(500)).await;
-                    log::warn!("FALLBACK to {}", fallback_model);
-                    call_openai_api(&fallback_model, &prompt, input).await
-                })
-                .await?
+    loop {
+        let inputs = DB.get_convo_history(thread).await?;
+        let ai_resp = call_openai_api(&llm_config.main_model, prompt, inputs).await?;
+        DB.add_msg(thread, ai_resp.clone()).await?;
+        if let ChatEntry::Assistant {
+            content,
+            tool_calls,
+        } = ai_resp
+        {
+            if let Some(content) = content {
+                return Ok(content);
+            } else if let Some(tool_calls) = tool_calls {
+                for tool_call in tool_calls {
+                    // call tool, save to db
+                    let content =
+                        call_tool(&tool_call.function.name, &tool_call.function.arguments).await?;
+                    DB.add_msg(
+                        thread,
+                        ChatEntry::Tool {
+                            content,
+                            tool_call_id: tool_call.id,
+                            name: tool_call.function.name,
+                        },
+                    )
+                    .await?;
+                }
+            } else {
+                anyhow::bail!(
+                    "OpenAi sent a ChatEntry::Assistant with no content AND no tool_calls!"
+                )
+            }
+        } else {
+            anyhow::bail!("OpenAi sent a ChatEntry whose role is NOT 'assistant'!")
         }
-        None => todo!(),
-    };
-    Ok(resp_string)
+    }
+}
+
+async fn call_tool(name: &str, arguments: &str) -> anyhow::Result<String> {
+    let name = name.to_string();
+    let param = arguments.to_string();
+    smol::unblock(move || {
+        let args: Value = serde_json::from_str(&param).context("cannot deserialize param")?;
+        let res = (TOOLS
+            .get(&name)
+            .context("requested tool does not exist")?
+            .call)(args)?;
+        Ok(res)
+    })
+    .await
 }

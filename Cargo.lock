@@ -346,6 +346,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8b75356056920673b02621b35afd0f7dda9306d03c79a30f5c56c44cf256e3de"
 
 [[package]]
+name = "async-trait"
+version = "0.1.80"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c6fa2087f2753a7da8cc1c0dbfcf89579dd57458e36769de5ac750b4671737ca"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.63",
+]
+
+[[package]]
 name = "atoi"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1000,12 +1011,14 @@ dependencies = [
  "argh",
  "async-broadcast",
  "async-compat",
+ "async-trait",
  "base64 0.21.7",
  "chrono",
  "env_logger",
  "futures-util",
  "isahc",
  "log",
+ "nursery_macro",
  "once_cell",
  "rand",
  "regex",
@@ -1647,6 +1660,15 @@ checksum = "4161fcb6d602d4d2081af7c3a45852d875a03dd337a6bfdd6e06407b61342a43"
 dependencies = [
  "hermit-abi",
  "libc",
+]
+
+[[package]]
+name = "nursery_macro"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "791111c4315a831f9ed62c9acd795be7557185c126ef188823298ed81390dc53"
+dependencies = [
+ "smol",
 ]
 
 [[package]]
