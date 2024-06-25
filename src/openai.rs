@@ -39,6 +39,7 @@ pub struct ToolCallFunction {
 
 pub async fn call_openai_api(
     model: &str,
+    temperature: f32,
     prompt: &str,
     mut inputs: Vec<ChatEntry>,
 ) -> anyhow::Result<ChatEntry> {
@@ -50,6 +51,7 @@ pub async fn call_openai_api(
     );
     let req = json!({
         "model": model,
+        "temperature": temperature,
         "messages": serde_json::to_value(inputs)?,
         "tools": get_tools(),
         "tool_choice": "auto",

@@ -38,6 +38,7 @@ struct Config {
 struct LlmConfig {
     openai_key: String,
     model: String,
+    temperature: f32,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
