@@ -76,11 +76,17 @@ impl Platform for Email {
 
         static MAILGUN_LIMIT: Lazy<Semaphore> = Lazy::new(|| Semaphore::new(16));
         let _guard = MAILGUN_LIMIT.acquire().await;
+
+        let text = format!(
+            "From GephSupportBot\n来自迷雾通客服机器人：\n\n{}\n\n---\nIf GephSupportBot cannot resolve the issue, our human support will respond within 48 hours. Thanks for your patience!\n如果机器人不能解决您的问题，我们的人工客服会在48小时以内回复您。请耐心等待！",
+            outgoing_msg.text.clone()
+        );
+
         let mut params = vec![
             ("from".to_string(), self.config.address.clone()),
             ("to".to_string(), outgoing_msg.to.to_string()),
             ("subject".to_string(), title),
-            ("text".to_string(), outgoing_msg.text.clone()),
+            ("text".to_string(), text),
         ];
         if let Some(cc) = self.config.cc.clone() {
             params.push(("cc".to_string(), cc));
