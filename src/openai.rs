@@ -72,9 +72,9 @@ pub async fn call_openai_api(
         .json()
         .await?;
 
-    // log::debug!("OPENAI RESP = {:#?}", resp);
+    log::debug!("OPENAI RESP = {:#?}", resp);
 
-    let resp_msg = &mut resp["choices"][0]["message"];
+    let resp_msg = resp["choices"][0]["message"].clone();
     let content = resp_msg["content"].as_str().map(|s| s.to_string());
     let tool_calls = resp_msg["tool_calls"]
         .as_array()
