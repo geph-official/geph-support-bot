@@ -84,14 +84,14 @@ impl Platform for Email {
         );
 
         let mut params = vec![
+            ("from".to_string(), self.config.address.clone()),
             (
-                "from".to_string(),
+                "to".to_string(),
                 Regex::new(r"\+[^@]*@")
                     .unwrap()
-                    .replace(&self.config.address, "@")
+                    .replace(&outgoing_msg.to, "@")
                     .to_string(),
             ),
-            ("to".to_string(), outgoing_msg.to.to_string()),
             ("subject".to_string(), title),
             ("text".to_string(), text),
         ];
