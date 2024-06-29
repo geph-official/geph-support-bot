@@ -151,6 +151,7 @@ fn parse_email(email: HashMap<String, String>) -> anyhow::Result<(IncomingMsg, S
         .clone();
 
     let title_tag = extract_number(&title).unwrap_or_default();
+    // this title tag is ignored by email systems
     let from = from.replace('@', &format!("+{title_tag}@"));
 
     let msg_id = email
