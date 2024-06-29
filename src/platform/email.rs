@@ -87,10 +87,10 @@ impl Platform for Email {
             ("from".to_string(), self.config.address.clone()),
             (
                 "to".to_string(),
-                Regex::new(r"\+[^@]*@")
+                dbg!(Regex::new(r"\+[^@]*@")
                     .unwrap()
                     .replace(&outgoing_msg.to, "@")
-                    .to_string(),
+                    .to_string()),
             ),
             ("subject".to_string(), title),
             ("text".to_string(), text),
