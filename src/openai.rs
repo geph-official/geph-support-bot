@@ -55,7 +55,7 @@ pub async fn call_openai_api(
         "messages": serde_json::to_value(inputs)?,
         "tools": get_tools(),
         "tool_choice": "auto",
-        "max_tokens": 500
+        "max_tokens": 2000
     });
 
     log::debug!("sending to openai: {:#?}", req);

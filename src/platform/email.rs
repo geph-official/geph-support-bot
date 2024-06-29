@@ -5,6 +5,7 @@ use async_compat::CompatExt;
 use async_trait::async_trait;
 use isahc::http;
 use once_cell::sync::Lazy;
+use regex::Regex;
 use reqwest::{header, Client};
 use serde::{Deserialize, Serialize};
 use smol::{lock::Semaphore, Task};
@@ -123,6 +124,13 @@ impl Platform for Email {
     }
 }
 
+fn extract_number(s: &str) -> Option<i32> {
+    let re = Regex::new(r"\[#(\d+)\]").unwrap();
+    re.captures(s)
+        .and_then(|caps| caps.get(1))
+        .and_then(|m| m.as_str().parse().ok())
+}
+
 fn parse_email(email: HashMap<String, String>) -> anyhow::Result<(IncomingMsg, String)> {
     let title = email
         .get("subject")
@@ -141,6 +149,10 @@ fn parse_email(email: HashMap<String, String>) -> anyhow::Result<(IncomingMsg, S
         .get("from")
         .unwrap_or(&"Unknown Sender".to_string())
         .clone();
+
+    let title_tag = extract_number(&title).unwrap_or_default();
+    let from = from.replace('@', &format!("+{title_tag}@"));
+
     let msg_id = email
         .get("Message-Id")
         .unwrap_or(&"No Message-Id".to_string())
