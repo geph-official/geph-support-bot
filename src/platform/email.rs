@@ -84,7 +84,13 @@ impl Platform for Email {
         );
 
         let mut params = vec![
-            ("from".to_string(), self.config.address.clone()),
+            (
+                "from".to_string(),
+                Regex::new(r"\+[^@]*@")
+                    .unwrap()
+                    .replace(&self.config.address, "@")
+                    .to_string(),
+            ),
             ("to".to_string(), outgoing_msg.to.to_string()),
             ("subject".to_string(), title),
             ("text".to_string(), text),
@@ -151,7 +157,6 @@ fn parse_email(email: HashMap<String, String>) -> anyhow::Result<(IncomingMsg, S
         .clone();
 
     let title_tag = extract_number(&title).unwrap_or_default();
-    // this title tag is ignored by email systems
     let from = from.replace('@', &format!("+{title_tag}@"));
 
     let msg_id = email
