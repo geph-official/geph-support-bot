@@ -146,6 +146,8 @@ fn parse_email(email: HashMap<String, String>) -> anyhow::Result<(IncomingMsg, S
         .unwrap_or(&"No Message-Id".to_string())
         .clone();
 
+    log::debug!("got an email from {from}");
+
     Ok((IncomingMsg { text, from, msg_id }, title))
 
     // let date = email
