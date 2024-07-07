@@ -14,7 +14,7 @@ impl ChatHistoryDb {
         let mut conn = SqliteConnection::connect(&format!("file:{db_path}?mode=rwc")).await?;
         conn.execute(
             "CREATE TABLE IF NOT EXISTS chat_entries (
-            thread BIGINT,
+            thread TEXT,
             chat_entry BLOB
         )",
         )

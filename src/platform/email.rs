@@ -13,8 +13,9 @@ use smol_timeout::TimeoutExt;
 use warp::Filter;
 
 use crate::{
+    openai::{call_openai_api, ChatEntry},
     platform::{IncomingMsg, Platform},
-    EmailConfig,
+    EmailConfig, CONFIG,
 };
 
 use super::OutgoingMsg;
@@ -41,7 +42,7 @@ impl Email {
             .then(move |email: HashMap<String, String>| {
                 let send_msgs = send_msgs.clone();
                 async move {
-                    match parse_email(email) {
+                    match parse_email(email).await {
                         Ok((msg, title)) => {
                             let _ = send_msgs.send((msg, title)).await;
                             http::StatusCode::OK
@@ -137,15 +138,18 @@ fn extract_number(s: &str) -> Option<i32> {
         .and_then(|m| m.as_str().parse().ok())
 }
 
-fn parse_email(email: HashMap<String, String>) -> anyhow::Result<(IncomingMsg, String)> {
+async fn parse_email(email: HashMap<String, String>) -> anyhow::Result<(IncomingMsg, String)> {
     let title = email
         .get("subject")
         .unwrap_or(&"Unknown Subject".to_string())
         .clone();
-    let body = email
-        .get("body-plain")
-        .unwrap_or(&"No Content".to_string())
-        .clone();
+    let body = cleanup_email(
+        email
+            .get("body-plain")
+            .unwrap_or(&"No Content".to_string())
+            .clone(),
+    )
+    .await?;
     let text = serde_json::to_string(&EmailMsg {
         title: title.clone(),
         body,
@@ -190,12 +194,29 @@ fn parse_email(email: HashMap<String, String>) -> anyhow::Result<(IncomingMsg, S
     //     .to_string();
 }
 
-//         let resp = format!(
-//             "{}\n\n{}\n\n> ------- Original Message -------\n> On {}, {} <{}> wrote:\n> \n> {}",
-//             resp,
-//             &CONFIG.email_config.as_ref().unwrap().signature,
-//             parsed_email.date,
-//             parsed_email.sender_name,
-//             parsed_email.sender_email,
-//             parsed_email.body.replace("\n", "\n> ")
-//         );
+async fn cleanup_email(email_body: String) -> anyhow::Result<String> {
+    let llm_config = CONFIG.llm_config.clone();
+    let prompt = r#"
+You are a email clean-up agent. You are given emails forwarded from Freshdesk, a support framework. They often look like:
+
+"Hi GephSupportBot, The customer has responded to the ticket. Fwd: ..."
+
+Get the *latest* actual user message in the Fwd, removing all Freshdesk boilerplate and all previous messages in the conversation."#;
+    if let ChatEntry::Assistant {
+        content: Some(cleaned),
+        tool_calls: None,
+    } = call_openai_api(
+        &llm_config.model,
+        llm_config.temperature,
+        prompt,
+        vec![ChatEntry::User {
+            content: email_body,
+        }],
+    )
+    .await?
+    {
+        Ok(cleaned)
+    } else {
+        anyhow::bail!("unexpected response from LLM")
+    }
+}
