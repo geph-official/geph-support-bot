@@ -195,13 +195,14 @@ async fn parse_email(email: HashMap<String, String>) -> anyhow::Result<(Incoming
 }
 
 async fn cleanup_email(email_body: String) -> anyhow::Result<String> {
+    log::debug!("cleanup_email(): to_clean = {email_body}");
     let llm_config = CONFIG.llm_config.clone();
     let prompt = r#"
 You are a email clean-up agent. You are given emails forwarded from Freshdesk, a support framework. They often look like:
 
 "Hi GephSupportBot, The customer has responded to the ticket. Fwd: ..."
 
-Get the *latest* actual user message in the Fwd, removing all Freshdesk boilerplate and all previous messages in the conversation."#;
+Get the *latest* actual user message in the Fwd, removing all Freshdesk boilerplate and all previous messages in the conversation. Return the message and nothing else."#;
     if let ChatEntry::Assistant {
         content: Some(cleaned),
         tool_calls: None,
@@ -215,6 +216,7 @@ Get the *latest* actual user message in the Fwd, removing all Freshdesk boilerpl
     )
     .await?
     {
+        log::debug!("cleanup_email(): cleaned = {cleaned}");
         Ok(cleaned)
     } else {
         anyhow::bail!("unexpected response from LLM")
