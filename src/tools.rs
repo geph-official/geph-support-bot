@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use isahc::ReadResponseExt;
+use isahc::{ReadResponseExt, RequestExt};
 use once_cell::sync::Lazy;
 use schemars::{schema::SchemaObject, schema_for, JsonSchema};
 use serde::{de::DeserializeOwned, Deserialize};
@@ -58,15 +58,17 @@ impl Tool for TransferPlus {
     type P = TransferPlusParams;
 
     fn call(&self, params: Self::P) -> anyhow::Result<String> {
-        let mut res = isahc::post(
-            "https://beegsquush.labooyah.be/support/transfer-plus",
-            json!({
-                "old_uname": params.old_uname,
-                "new_uname": params.new_uname,
-                "secret": CONFIG.tools_config.support_secret,
-            })
-            .to_string(),
-        )?;
+        let mut res = isahc::Request::post("https://beegsquush.labooyah.be/support/transfer-plus")
+            .header("Content-Type", "application/json")
+            .body(
+                json!({
+                    "old_uname": params.old_uname,
+                    "new_uname": params.new_uname,
+                    "secret": CONFIG.tools_config.support_secret,
+                })
+                .to_string(),
+            )?
+            .send()?;
         if res.status().is_success() {
             Ok("Success".to_string())
         } else {
