@@ -60,6 +60,7 @@ pub struct EmailConfig {
 #[derive(Serialize, Deserialize, Clone)]
 struct ToolsConfig {
     query_chat_history_db_secret: String,
+    support_secret: String,
 }
 
 static ARGS: Lazy<Args> = Lazy::new(argh::from_env);
