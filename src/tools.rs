@@ -48,7 +48,7 @@ pub const TOOLS: Lazy<HashMap<String, ErasedTool>> = Lazy::new(|| {
 // ---------- Transfer Plus ------------
 pub struct TransferPlus;
 
-#[derive(JsonSchema, Deserialize)]
+#[derive(JsonSchema, Deserialize, Debug)]
 pub struct TransferPlusParams {
     old_uname: String,
     new_uname: String,
@@ -58,6 +58,7 @@ impl Tool for TransferPlus {
     type P = TransferPlusParams;
 
     fn call(&self, params: Self::P) -> anyhow::Result<String> {
+        log::debug!("TransferPlus Call! params: {:?}", params);
         let mut res = isahc::Request::post("https://beegsquush.labooyah.be/support/transfer-plus")
             .header("Content-Type", "application/json")
             .body(
@@ -70,9 +71,11 @@ impl Tool for TransferPlus {
             )?
             .send()?;
         if res.status().is_success() {
+            log::debug!("TransferPlus SUCCESS! params: {:?}", params);
             Ok("Success".to_string())
         } else {
             let error_msg = res.text()?;
+            log::debug!("TransferPlus ERROR = {error_msg}! params: {:?}", params);
             anyhow::bail!(
                 "Request failed with status: {}. Error message: {}",
                 res.status(),
