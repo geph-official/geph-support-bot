@@ -21,8 +21,7 @@ pub async fn generate_response(thread: &str, user_input: &str) -> anyhow::Result
 
     loop {
         let inputs = DB.get_convo_history(thread).await?;
-        let ai_resp =
-            call_openai_api(&llm_config.model, llm_config.temperature, prompt, inputs).await?;
+        let ai_resp = call_openai_api(&llm_config.model, prompt, inputs).await?;
         DB.add_msg(thread, ai_resp.clone()).await?;
         if let ChatEntry::Assistant {
             content,

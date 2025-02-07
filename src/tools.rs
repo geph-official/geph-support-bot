@@ -78,6 +78,41 @@ impl Tool for TransferPlus {
             log::debug!("TransferPlus ERROR = {error_msg}! params: {:?}", params);
             anyhow::bail!(
                 "Request failed with status: {}. Error message: {}",
+                // #[derive(JsonSchema, Deserialize)]
+                // pub struct QueryChatHistoryDbParams {
+                //     sql: String,
+                //     secret: String,
+                // }
+
+                // impl Tool for QueryChatHistoryDb {
+                //     type P = QueryChatHistoryDbParams;
+
+                //     fn call(&self, params: Self::P) -> anyhow::Result<String> {
+                //         if params.secret == CONFIG.tools_config.query_chat_history_db_secret {
+                //             let res = smolscale::block_on(async move { DB.query(&params.sql).await })?;
+                //             // println!("QueryChatHistoryDb.call() = {res}");
+                //             Ok(res)
+                //         } else {
+                //             anyhow::bail!("Unauthorized.");
+                //         }
+                //     }
+
+                //     fn name(&self) -> String {
+                //         "query_chat_history_db".to_string()
+                //     }
+
+                //     fn description(&self) -> String {
+                //         "This tool runs an arbitrary sql query on the internal chat history database, returning columns formatted in CSS. The db is an SQLite db with one table:
+
+                //         chat_entries (
+                //             thread TEXT,
+                //             chat_entry BLOB
+
+                //         You should use this tool when asked to give information about support history. The 'secret' field is a key that the user passes in.
+                //         "
+                //         .to_string()
+                //     }
+                // }
                 res.status(),
                 error_msg
             )
@@ -94,40 +129,40 @@ impl Tool for TransferPlus {
 }
 
 // ---------- Query Chat History DB -----------
-pub struct QueryChatHistoryDb;
+// pub struct QueryChatHistoryDb;
 
-#[derive(JsonSchema, Deserialize)]
-pub struct QueryChatHistoryDbParams {
-    sql: String,
-    secret: String,
-}
+// #[derive(JsonSchema, Deserialize)]
+// pub struct QueryChatHistoryDbParams {
+//     sql: String,
+//     secret: String,
+// }
 
-impl Tool for QueryChatHistoryDb {
-    type P = QueryChatHistoryDbParams;
+// impl Tool for QueryChatHistoryDb {
+//     type P = QueryChatHistoryDbParams;
 
-    fn call(&self, params: Self::P) -> anyhow::Result<String> {
-        if params.secret == CONFIG.tools_config.query_chat_history_db_secret {
-            let res = smolscale::block_on(async move { DB.query(&params.sql).await })?;
-            // println!("QueryChatHistoryDb.call() = {res}");
-            Ok(res)
-        } else {
-            anyhow::bail!("Unauthorized.");
-        }
-    }
+//     fn call(&self, params: Self::P) -> anyhow::Result<String> {
+//         if params.secret == CONFIG.tools_config.query_chat_history_db_secret {
+//             let res = smolscale::block_on(async move { DB.query(&params.sql).await })?;
+//             // println!("QueryChatHistoryDb.call() = {res}");
+//             Ok(res)
+//         } else {
+//             anyhow::bail!("Unauthorized.");
+//         }
+//     }
 
-    fn name(&self) -> String {
-        "query_chat_history_db".to_string()
-    }
+//     fn name(&self) -> String {
+//         "query_chat_history_db".to_string()
+//     }
 
-    fn description(&self) -> String {
-        "This tool runs an arbitrary sql query on the internal chat history database, returning columns formatted in CSS. The db is an SQLite db with one table:
+//     fn description(&self) -> String {
+//         "This tool runs an arbitrary sql query on the internal chat history database, returning columns formatted in CSS. The db is an SQLite db with one table:
 
-        chat_entries (
-            thread TEXT,
-            chat_entry BLOB
+//         chat_entries (
+//             thread TEXT,
+//             chat_entry BLOB
 
-        You should use this tool when asked to give information about support history. The 'secret' field is a key that the user passes in.
-        "
-        .to_string()
-    }
-}
+//         You should use this tool when asked to give information about support history. The 'secret' field is a key that the user passes in.
+//         "
+//         .to_string()
+//     }
+// }

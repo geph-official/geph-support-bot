@@ -208,7 +208,6 @@ Get the *latest* actual user message in the Fwd, removing all Freshdesk boilerpl
         tool_calls: None,
     } = call_openai_api(
         &llm_config.model,
-        llm_config.temperature,
         prompt,
         vec![ChatEntry::User {
             content: email_body,
