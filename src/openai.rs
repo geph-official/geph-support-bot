@@ -50,18 +50,19 @@ pub async fn call_openai_api(
     );
     let req = json!({
         "model": model,
+        "temperature": 0.1,
         "messages": serde_json::to_value(inputs)?,
-        "tools": get_tools(),
-        "tool_choice": "auto",
+        // "tools": get_tools(),
+        // "tool_choice": "auto",
     });
 
     log::debug!("sending to openai: {:#?}", req);
 
-    let mut resp: Value = Request::post("https://api.openai.com/v1/chat/completions")
+    let resp: Value = Request::post(CONFIG.llm_config.api_url.clone() + "/chat/completions")
         .header("Content-Type", "application/json")
         .header(
             "Authorization",
-            "Bearer ".to_string() + &CONFIG.llm_config.openai_key,
+            "Bearer ".to_string() + &CONFIG.llm_config.api_key,
         )
         .body(serde_json::to_vec(&req)?)?
         .send_async()

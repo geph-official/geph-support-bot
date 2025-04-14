@@ -36,7 +36,8 @@ struct Config {
 
 #[derive(Serialize, Deserialize, Clone)]
 struct LlmConfig {
-    openai_key: String,
+    api_url: String,
+    api_key: String,
     model: String,
 }
 

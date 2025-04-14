@@ -15,13 +15,13 @@ pub async fn generate_response(thread: &str, user_input: &str) -> anyhow::Result
         },
     )
     .await?;
-
     let llm_config = CONFIG.llm_config.clone();
     let prompt = include_str!("prompt.txt");
 
     loop {
         let inputs = DB.get_convo_history(thread).await?;
         let ai_resp = call_openai_api(&llm_config.model, prompt, inputs).await?;
+
         DB.add_msg(thread, ai_resp.clone()).await?;
         if let ChatEntry::Assistant {
             content,

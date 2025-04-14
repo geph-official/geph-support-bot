@@ -1,7 +1,8 @@
 history_db: absolute path to where to put the bot's conversations database
 
 llm_config:
-  openai_key: OpenAI API key
+  api_url: OpenAI-compatible API url
+  api_key: OpenAI-compatible API key
   # both main_model and fallback_model must be specified in OpenAI's API format
   main_model: main model used for the bot (gpt-4 recommended)
   fallback_model: optional field. Falls back to this model 
