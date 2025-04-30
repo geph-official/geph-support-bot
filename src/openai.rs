@@ -50,7 +50,7 @@ pub async fn call_openai_api(
     );
     let req = json!({
         "model": model,
-        "temperature": 0.1,
+        "temperature": 0.7,
         "messages": serde_json::to_value(inputs)?,
         // "tools": get_tools(),
         // "tool_choice": "auto",
