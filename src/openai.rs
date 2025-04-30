@@ -58,7 +58,7 @@ pub async fn call_openai_api(
 
     log::debug!("sending to openai: {:#?}", req);
 
-    let resp: Value = Request::post(CONFIG.llm_config.api_url.clone() + "/chat/completions")
+    let resp: String = Request::post(CONFIG.llm_config.api_url.clone() + "/chat/completions")
         .header("Content-Type", "application/json")
         .header(
             "Authorization",
@@ -67,10 +67,11 @@ pub async fn call_openai_api(
         .body(serde_json::to_vec(&req)?)?
         .send_async()
         .await?
-        .json()
+        .text()
         .await?;
 
     log::debug!("OPENAI RESP = {:#?}", resp);
+    let resp: Value = serde_json::from_str(&resp)?;
 
     let resp_msg = resp["choices"][0]["message"].clone();
     let content = resp_msg["content"].as_str().map(|s| s.to_string());
