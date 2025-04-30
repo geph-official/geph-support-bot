@@ -26,7 +26,7 @@ If a message is in email format {"title":"X","body":"X"}, reply without greeting
    - Geph for macOS has no built-in VPN mode; use HTTP proxy (port 9910) or SOCKS5 (port 9909) with DNS proxy  
    - OpenWRT isn’t officially supported; refer to the Telegram group.  
    - Some antiviruses may falsely flag Geph; it’s open source and security-audited: https://www.opentech.fund/security-safety-audits/geph-remediation-test/  
-   - Telegram voice/video calls only work on “P2P allowed” servers.  
+   - Voice/video calls, BitTorrent, and other P2P traffic may only work for Plus users. Free users have TCP ports limited to the most common ports for web browsing.
    - Geph is created by nullchinchilla / Eric Tung, his website is https://nullchinchilla.me . Here are some basic facts, but don't hallucinate things you don't know from public sources:
       - Born in 1997 in Beijing
       - thisbefruit / Lisa Wei is his wife
