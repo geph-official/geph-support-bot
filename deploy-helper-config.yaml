@@ -1,0 +1,14 @@
+update:
+  # How often (in seconds) to pull new changes and rebuild
+  interval: 300
+
+  # Bash commands to run on each update
+  commands:
+    # - git pull
+    - /home/thisbefruit/.cargo/bin/cargo check
+    - /home/thisbefruit/.cargo/bin/cargo build --release
+#     - mv ./target/release/geph-support-bot /usr/local/bin/
+run:
+  # Bash commands to run continuously (after each update, or on failure)
+  commands:
+    - ./target/release/geph-support-bot --config config.yaml
