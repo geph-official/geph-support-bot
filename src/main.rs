@@ -9,11 +9,16 @@ use std::path::PathBuf;
 use argh::FromArgs;
 use database::ChatHistoryDb;
 // use email::handle_email;
+use env_logger::{Builder, Env};
+use log::LevelFilter;
 use once_cell::sync::Lazy;
 use platform::{Email, IncomingMsg, OutgoingMsg, Platform, Telegram};
 use responder::generate_response;
 use serde::{Deserialize, Serialize};
 use smol::future::FutureExt;
+
+use crate::responder::get_latest_faq;
+
 // use telegram::{handle_telegram, TelegramBot};
 
 /// A tool to run the Geph support bot.
@@ -32,6 +37,7 @@ struct Config {
     telegram_config: TelegramConfig,
     email_config: EmailConfig,
     tools_config: ToolsConfig,
+    discourse_config: DiscourseConfig,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -63,6 +69,12 @@ struct ToolsConfig {
     support_secret: String,
 }
 
+#[derive(Serialize, Deserialize, Clone)]
+struct DiscourseConfig {
+    api_url: String,
+    api_key: String,
+}
+
 static ARGS: Lazy<Args> = Lazy::new(argh::from_env);
 
 static CONFIG: Lazy<Config> = Lazy::new(|| {
@@ -76,12 +88,21 @@ static DB: Lazy<ChatHistoryDb> = Lazy::new(|| {
 });
 
 fn main() {
-    env_logger::init();
+    // Initialize logger; default to debug level if RUST_LOG not set
+    let env = env_logger::Env::default().default_filter_or("debug");
+    let mut builder = env_logger::Builder::from_env(env);
+    builder.filter_level(LevelFilter::Off);
+    builder.filter_module("geph_support_bot", LevelFilter::Debug);
+    builder.init();
 
     let email = Email::new(&CONFIG.email_config);
     let telegram = Telegram::new(&CONFIG.telegram_config);
 
     smolscale::block_on(async { run_bot(email).race(run_bot(telegram)).await });
+    // smolscale::block_on(async {
+    //     let ret = get_latest_faq().await;
+    //     println!("{ret:?}");
+    // })
 }
 
 async fn run_bot(platform: impl Platform) {

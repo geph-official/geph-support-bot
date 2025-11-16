@@ -15,6 +15,21 @@ use crate::{
 
 use super::OutgoingMsg;
 
+fn escape_markdown_v2(text: &str) -> String {
+    let mut escaped = String::with_capacity(text.len());
+    for ch in text.chars() {
+        match ch {
+            '_' | '*' | '[' | ']' | '(' | ')' | '~' | '`' | '>' | '#' | '+' | '-' | '=' | '|'
+            | '{' | '}' | '.' | '!' | '\\' => {
+                escaped.push('\\');
+                escaped.push(ch);
+            }
+            _ => escaped.push(ch),
+        }
+    }
+    escaped
+}
+
 pub struct Telegram {
     token: String,
     client: isahc::HttpClient,
@@ -151,15 +166,16 @@ impl Platform for Telegram {
             chat_id,
             user_id: _,
         } = serde_json::from_str(&outgoing_msg.to)?;
+        // let escaped_text = escape_markdown_v2(&outgoing_msg.text);
         let json = match outgoing_msg.in_reply_to.clone() {
             Some(id) => json!({
                 "chat_id": chat_id,
-                "text": outgoing_msg.text.clone(),
+                "text": outgoing_msg.text,
                 "reply_to_message_id": id,
             }),
             None => json!({
                 "chat_id": chat_id,
-                "text": outgoing_msg.text.clone(),
+                "text": outgoing_msg.text,
             }),
         };
         call_api("sendMessage", json, &self.client, &self.token).await?;
