@@ -44,6 +44,7 @@ impl Email {
                 async move {
                     match parse_email(email).await {
                         Ok((msg, title)) => {
+                            log::debug!("INCOMING EMAIL MSG: {msg:?}");
                             let _ = send_msgs.send((msg, title)).await;
                             http::StatusCode::OK
                         }
