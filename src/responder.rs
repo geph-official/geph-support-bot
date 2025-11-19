@@ -192,9 +192,11 @@ pub async fn generate_response(thread: &str, user_input: &str) -> anyhow::Result
     )
     .await?;
     let llm_config = CONFIG.llm_config.clone();
+    let current_date_time =
+        "The current date and time is: ".to_string() + &chrono::Utc::now().to_string() + "\n";
     let prompt_fixed = include_str!("prompt.txt").to_owned();
     let prompt_faq = get_latest_faq().await?;
-    let prompt = prompt_fixed + &prompt_faq;
+    let prompt = current_date_time + &prompt_fixed + &prompt_faq;
 
     loop {
         let inputs = DB.get_convo_history(thread).await?;
