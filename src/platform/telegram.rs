@@ -1,12 +1,15 @@
-use std::time::Duration;
+use std::{convert::TryFrom, time::Duration};
 
-use anyhow::Context;
+use anyhow::{Context, Result};
+use async_channel::{unbounded, Receiver, Sender};
 use async_trait::async_trait;
-use isahc::{AsyncReadResponseExt, HttpClient, Request};
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
-use smol::Task;
-use smol_timeout::TimeoutExt;
+use teloxide::{
+    adaptors::DefaultParseMode,
+    prelude::*,
+    types::{ChatId, ChatKind, Message, MessageId, ParseMode, UpdateKind},
+};
+use tokio::runtime::Runtime;
 
 use crate::{
     platform::{IncomingMsg, Platform},
@@ -14,6 +17,8 @@ use crate::{
 };
 
 use super::OutgoingMsg;
+
+type MarkdownBot = DefaultParseMode<teloxide::Bot>;
 
 fn escape_markdown_v2(text: &str) -> String {
     let mut escaped = String::with_capacity(text.len());
@@ -31,10 +36,9 @@ fn escape_markdown_v2(text: &str) -> String {
 }
 
 pub struct Telegram {
-    token: String,
-    client: isahc::HttpClient,
-    _task: Task<()>,
-    recv_msgs: smol::channel::Receiver<IncomingMsg>,
+    recv_msgs: Receiver<IncomingMsg>,
+    send_reqs: Sender<SendRequest>,
+    _thread: std::thread::JoinHandle<()>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -43,146 +47,169 @@ pub struct TelegramThread {
     pub user_id: i64,
 }
 
+struct SendRequest {
+    msg: OutgoingMsg,
+    completion: Sender<anyhow::Result<()>>,
+}
+
 impl Telegram {
     pub fn new(config: &TelegramConfig) -> Self {
         let config = config.clone();
-        let client = isahc::HttpClientBuilder::new()
-            .max_connections(4)
-            .build()
-            .unwrap();
-        let (send_msgs, recv_msgs) = smol::channel::unbounded();
-        let token = config.telegram_token.clone();
-        let http_client = client.clone();
+        let (incoming_tx, incoming_rx) = unbounded();
+        let (send_tx, send_rx) = unbounded();
 
-        let _task = smol::spawn(async move {
-            let mut counter = 0;
-            loop {
-                log::info!("getting updates at {counter}");
-                let fallible = async {
-                    let updates = call_api(
-                        "getUpdates",
-                        json!({"timeout": 120, "offset": counter + 1, "allowed_updates": []}),
-                        &http_client,
-                        &config.telegram_token,
-                    )
-                    .await
-                    .context("cannot call telegram for updates")?;
-                    let updates: Vec<Value> = serde_json::from_value(updates)?;
-                    for update in updates {
-                        // we only support text msgs atm
-                        counter = counter.max(update["update_id"].as_i64().unwrap_or_default());
-                        if !update["message"]["text"].is_null() {
-                            let msg = update["message"]["text"]
-                                .as_str()
-                                .context("cannot parse out text")?;
-                            log::info!("msg = {msg}");
-                            // check if the msg is for us
-                            if msg.contains(&("@".to_owned() + &config.bot_uname))
-                                || update["message"]["reply_to_message"]["from"]["username"]
-                                    .as_str()
-                                    == Some(&config.bot_uname)
-                                || update["message"]["chat"]["type"].as_str() == Some("private")
-                            {
-                                // send into channel
-                                let chat_id = update["message"]["chat"]["id"]
-                                    .as_i64()
-                                    .context("telegram: could not get chat_id")?;
-                                let user_id = update["message"]["from"]["id"]
-                                    .as_i64()
-                                    .context("telegram: could not get sender id")?;
-                                let from =
-                                    serde_json::to_string(&TelegramThread { chat_id, user_id })?;
-                                let msg_id = update["message"]["message_id"]
-                                    .as_i64()
-                                    .context("could not get message_id")?;
-                                let mut text =
-                                    msg.replace(&("@".to_owned() + &config.bot_uname), "");
-                                if let Some(uname) = update["message"]["from"]["username"].as_str()
-                                {
-                                    text = format!("From {uname}: \n{text}");
-                                };
-                                send_msgs
-                                    .send(IncomingMsg {
-                                        text,
-                                        from,
-                                        msg_id: msg_id.to_string(),
-                                    })
-                                    .await?;
-                            }
-                        }
-                    }
-                    anyhow::Ok(())
-                };
-                match fallible.timeout(Duration::from_secs(300)).await {
-                    Some(x) => {
-                        if let Err(err) = x {
-                            log::error!("error getting updates: {:?}", err)
-                        }
-                    }
-                    None => log::error!("timed out getting telegram updates!"),
-                }
-            }
+        let thread_handle = std::thread::spawn(move || {
+            let runtime = Runtime::new().expect("failed to start tokio runtime for telegram");
+            runtime.block_on(async move {
+                run_telegram_loop(config, incoming_tx, send_rx).await;
+            });
         });
+
         Self {
-            token,
-            client,
-            _task,
-            recv_msgs,
+            recv_msgs: incoming_rx,
+            send_reqs: send_tx,
+            _thread: thread_handle,
         }
     }
 }
 
-async fn call_api(
-    method: &str,
-    args: Value,
-    http_client: &HttpClient,
-    token: &str,
-) -> anyhow::Result<Value> {
-    let raw_res: Value = http_client
-        .send_async(
-            Request::post(format!("https://api.telegram.org/bot{}/{method}", token))
-                .header("Content-Type", "application/json")
-                .body(serde_json::to_vec(&args)?)?,
-        )
-        .await?
-        .json()
-        .await?;
-    if raw_res["ok"].as_bool().unwrap_or(false) {
-        Ok(raw_res["result"].clone())
-    } else {
-        anyhow::bail!(
-            "telegram failed with error code {}",
-            raw_res["error_code"]
-                .as_i64()
-                .context("could not parse error code as integer")?
-        )
+async fn run_telegram_loop(
+    config: TelegramConfig,
+    incoming_tx: Sender<IncomingMsg>,
+    send_rx: Receiver<SendRequest>,
+) {
+    let http_client = teloxide::net::default_reqwest_settings()
+        // Allow Telegram long polling (120s) to finish before reqwest aborts.
+        .timeout(Duration::from_secs(130))
+        .build()
+        .expect("failed to build Telegram reqwest client");
+    let bot = teloxide::Bot::with_client(config.telegram_token, http_client)
+        .parse_mode(ParseMode::MarkdownV2);
+    let bot_username = config.bot_uname;
+
+    let updates_task = tokio::spawn(run_updates(bot.clone(), bot_username, incoming_tx));
+    let send_task = tokio::spawn(run_sender(bot.clone(), send_rx));
+
+    let _ = tokio::join!(updates_task, send_task);
+}
+
+async fn run_updates(bot: MarkdownBot, bot_username: String, incoming_tx: Sender<IncomingMsg>) {
+    let mention = format!("@{}", bot_username);
+    let mut offset: i32 = 0;
+    loop {
+        match bot
+            .get_updates()
+            .offset(offset + 1)
+            .allowed_updates(Vec::new())
+            .timeout(120)
+            .send()
+            .await
+        {
+            Ok(updates) => {
+                for update in updates {
+                    offset = offset.max(update.id);
+                    if let UpdateKind::Message(message) = update.kind {
+                        if let Some(text) = message.text() {
+                            if should_handle(&message, text, &mention, &bot_username) {
+                                if let Err(err) =
+                                    forward_message(&message, text, &mention, &incoming_tx).await
+                                {
+                                    log::error!("failed to forward telegram message: {err:?}");
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            Err(err) => {
+                log::error!("failed to fetch telegram updates: {err:?}");
+                tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+            }
+        }
     }
+}
+
+fn should_handle(message: &Message, text: &str, mention: &str, bot_username: &str) -> bool {
+    let mentions_bot = text.contains(mention);
+    let is_reply_to_bot = message
+        .reply_to_message()
+        .and_then(|msg| msg.from())
+        .and_then(|user| user.username.as_deref())
+        .map(|uname| uname == bot_username)
+        .unwrap_or(false);
+    let is_private = matches!(message.chat.kind, ChatKind::Private(_));
+
+    is_private || mentions_bot || is_reply_to_bot
+}
+
+async fn forward_message(
+    message: &Message,
+    text: &str,
+    mention: &str,
+    incoming_tx: &Sender<IncomingMsg>,
+) -> Result<()> {
+    let chat_id = message.chat.id.0;
+    let user_id = message
+        .from()
+        .and_then(|user| i64::try_from(user.id.0).ok())
+        .unwrap_or(chat_id);
+    let from = serde_json::to_string(&TelegramThread { chat_id, user_id })?;
+    let msg_id = message.id.0.to_string();
+    let mut cleaned = text.replace(mention, "");
+    if let Some(uname) = message.from().and_then(|user| user.username.as_deref()) {
+        cleaned = format!("From {uname}: \n{cleaned}");
+    }
+    incoming_tx
+        .send(IncomingMsg {
+            text: cleaned,
+            from,
+            msg_id,
+        })
+        .await
+        .context("telegram: failed to enqueue incoming message")?;
+    Ok(())
+}
+
+async fn run_sender(bot: MarkdownBot, send_rx: Receiver<SendRequest>) {
+    while let Ok(req) = send_rx.recv().await {
+        let result = send_single(bot.clone(), req.msg).await;
+        let _ = req.completion.send(result).await;
+    }
+}
+
+async fn send_single(bot: MarkdownBot, outgoing: OutgoingMsg) -> anyhow::Result<()> {
+    let TelegramThread { chat_id, .. } = serde_json::from_str(&outgoing.to)?;
+    let escaped_text = escape_markdown_v2(&outgoing.text);
+    let mut request = bot.send_message(ChatId(chat_id), escaped_text);
+    if let Some(reply_to) = outgoing
+        .in_reply_to
+        .as_deref()
+        .and_then(|id| id.parse::<i32>().ok())
+    {
+        request = request.reply_to_message_id(MessageId(reply_to));
+    }
+    request.send().await?;
+    Ok(())
 }
 
 #[async_trait]
 impl Platform for Telegram {
     async fn send_msg(&self, outgoing_msg: &OutgoingMsg) -> anyhow::Result<()> {
-        let TelegramThread {
-            chat_id,
-            user_id: _,
-        } = serde_json::from_str(&outgoing_msg.to)?;
-        // let escaped_text = escape_markdown_v2(&outgoing_msg.text);
-        let json = match outgoing_msg.in_reply_to.clone() {
-            Some(id) => json!({
-                "chat_id": chat_id,
-                "text": outgoing_msg.text,
-                "reply_to_message_id": id,
-            }),
-            None => json!({
-                "chat_id": chat_id,
-                "text": outgoing_msg.text,
-            }),
-        };
-        call_api("sendMessage", json, &self.client, &self.token).await?;
-        Ok(())
+        let (tx, rx) = async_channel::bounded(1);
+        self.send_reqs
+            .send(SendRequest {
+                msg: outgoing_msg.clone(),
+                completion: tx,
+            })
+            .await
+            .context("telegram: failed to queue outgoing message")?;
+        rx.recv().await.context("telegram: sender task dropped")?
     }
 
     async fn recv_msg(&self) -> IncomingMsg {
-        self.recv_msgs.recv().await.unwrap()
+        self.recv_msgs
+            .recv()
+            .await
+            .expect("telegram receiver closed")
     }
 }

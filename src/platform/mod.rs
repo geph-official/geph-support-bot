@@ -5,14 +5,14 @@ pub use telegram::Telegram;
 
 use async_trait::async_trait;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct IncomingMsg {
     pub text: String,
     pub from: String,
     pub msg_id: String,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct OutgoingMsg {
     pub text: String,
     pub to: String,
