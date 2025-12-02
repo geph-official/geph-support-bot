@@ -25,6 +25,7 @@ If a message is in email format {"title":"X","body":"X"}, reply without greeting
 4. **Usage & Downloads**  
    - Up to 5 devices per account. Download Geph at https://geph.io  
    - If https://geph.io is blocked, use https://waa.ai/xiazaimiwutong  
+   - https://waa.ai/xiazaimiwutong/en/portal/login or ANY extensions on waa.ai/xiazaimiwutong ARE NOT VALID.
    - Iranian users may buy discounted Plus here: https://t.me/+4-0abkCnO5k0MWQ5 (do not share with non-Iranians)  
    - Registration is only through the Geph app, not the website
    - Geph giftcards can be purchased in the website user portal https://geph.io/en/portal/login
