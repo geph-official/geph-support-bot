@@ -56,7 +56,10 @@ pub async fn call_openai_api(
         // "tool_choice": "auto",
     });
 
-    log::debug!("sending to openai: {:#?}", req);
+    log::debug!(
+        "sending to openai: {}",
+        serde_json::to_string_pretty(&req).unwrap()
+    );
 
     let resp: String = Request::post(CONFIG.llm_config.api_url.clone() + "/chat/completions")
         .header("Content-Type", "application/json")
